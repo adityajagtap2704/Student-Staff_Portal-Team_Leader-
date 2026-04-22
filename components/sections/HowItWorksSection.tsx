@@ -48,10 +48,10 @@ function Connector({ index, trigger }: { index: number; trigger: boolean }) {
         style={{
           background: "repeating-linear-gradient(90deg, #1D9E75 0px, #1D9E75 6px, transparent 6px, transparent 14px)",
           backgroundSize: "14px 1px",
+          originX: 0
         }}
         initial={{ opacity: 0, scaleX: 0 }}
         animate={trigger ? { opacity: 1, scaleX: 1 } : {}}
-        style2={{ originX: 0 }}
         transition={{ duration: 0.9, delay: 0.5 + index * 0.25, ease: [0.22, 1, 0.36, 1] }}
       />
       {/* Arrow tip */}

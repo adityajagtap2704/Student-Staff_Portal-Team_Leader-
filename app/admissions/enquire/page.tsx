@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { GraduationCap, User, Mail, Phone, BookOpen, MessageSquare, ArrowRight, CheckCircle2, Copy, Check, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { GraduationCap, User, Mail, Phone, BookOpen, MessageSquare, ArrowRight, ArrowLeft, Calendar } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Input";
@@ -12,28 +13,31 @@ function generateRef() {
 }
 
 export default function AdmissionEnquiryPage() {
+  const router = useRouter();
   const [form, setForm] = useState({
     studentName: "",
     parentName: "",
     email: "",
     phone: "",
     grade: "",
+    startDate: "",
     message: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading]   = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [refNumber, setRefNumber] = useState("");
-  const [copied, setCopied]       = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.studentName.trim()) e.studentName = "Student name is required";
     if (!form.parentName.trim())  e.parentName  = "Parent/guardian name is required";
-    if (!form.email.trim())       e.email       = "Email address is required";
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email address";
-    if (!form.phone.trim())       e.phone       = "Phone number is required";
-    if (!form.grade)              e.grade       = "Please select a grade";
+    if (form.email.trim() && !/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email address";
+    
+    if (!form.phone.trim()) e.phone = "Phone number is required";
+    else if (!/^\d+$/.test(form.phone)) e.phone = "Phone number must be numeric";
+    else if (form.phone.length < 8) e.phone = "Phone number is too short";
+
+    if (!form.grade) e.grade = "Please select a class";
+    if (!form.startDate) e.startDate = "Preferred start date is required";
     return e;
   };
 
@@ -43,69 +47,17 @@ export default function AdmissionEnquiryPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
+    // Simulate API call
     await new Promise((r) => setTimeout(r, 1500));
     const ref = generateRef();
-    setRefNumber(ref);
     setLoading(false);
-    setSubmitted(true);
+    
+    // Redirect to confirmation page with ref number
+    router.push(`/admissions/confirmation?ref=${ref}`);
   };
 
-  const copyRef = async () => {
-    await navigator.clipboard.writeText(refNumber);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-emerald-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary-100/30 blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-emerald-100/30 blur-3xl" />
-        </div>
-        <div className="relative w-full max-w-md animate-scale-in">
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-white/60 shadow-soft p-8 text-center">
-            <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 flex items-center justify-center mb-5 animate-bounce-in">
-              <CheckCircle2 size={32} className="text-emerald-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-[#444]">Enquiry Submitted!</h2>
-            <p className="mt-2 text-sm text-gray-400 max-w-xs mx-auto">
-              Thank you for your interest in KALNET. Our admissions team will contact you within 2 business days.
-            </p>
-
-            {/* Reference number */}
-            <div className="mt-6 p-4 bg-primary-50 rounded-2xl border border-primary-100">
-              <p className="text-xs font-medium text-primary-600 mb-2">Your Reference Number</p>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-xl font-bold text-primary tracking-wider font-mono">{refNumber}</span>
-                <button
-                  onClick={copyRef}
-                  className="h-7 w-7 rounded-lg bg-white border border-primary-200 flex items-center justify-center text-primary hover:bg-primary-50 transition-colors"
-                  aria-label="Copy reference number"
-                >
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
-                </button>
-              </div>
-              <p className="text-xs text-primary-500 mt-2">Save this number for future reference</p>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              <Link href="/login">
-                <Button fullWidth variant="primary">
-                  Go to Student Portal
-                </Button>
-              </Link>
-              <Link href="/">
-                <Button fullWidth variant="ghost" size="sm">
-                  Back to Home
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Get today's date for minimum date constraint
+  const today = new Date().toISOString().split("T")[0];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-blue-50 flex flex-col p-4 py-8">
@@ -148,7 +100,7 @@ export default function AdmissionEnquiryPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Student Name"
+                label="Student Name *"
                 placeholder="Full name"
                 value={form.studentName}
                 onChange={(e) => setForm({ ...form, studentName: e.target.value })}
@@ -156,7 +108,7 @@ export default function AdmissionEnquiryPage() {
                 icon={<User size={15} />}
               />
               <Input
-                label="Parent / Guardian"
+                label="Parent / Guardian *"
                 placeholder="Full name"
                 value={form.parentName}
                 onChange={(e) => setForm({ ...form, parentName: e.target.value })}
@@ -167,7 +119,7 @@ export default function AdmissionEnquiryPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Email Address"
+                label="Email Address (Optional)"
                 type="email"
                 placeholder="you@example.com"
                 value={form.email}
@@ -176,9 +128,9 @@ export default function AdmissionEnquiryPage() {
                 icon={<Mail size={15} />}
               />
               <Input
-                label="Phone Number"
+                label="Phone Number *"
                 type="tel"
-                placeholder="+91 98765 43210"
+                placeholder="Numeric only"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 error={errors.phone}
@@ -186,29 +138,53 @@ export default function AdmissionEnquiryPage() {
               />
             </div>
 
-            {/* Grade select */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[#444]">Applying for Grade</label>
-              <div className="relative">
-                <BookOpen size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <select
-                  value={form.grade}
-                  onChange={(e) => setForm({ ...form, grade: e.target.value })}
-                  className={`
-                    w-full rounded-xl border bg-white pl-10 pr-4 py-2.5 text-sm text-[#444]
-                    transition-all duration-200 appearance-none
-                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
-                    shadow-inner-sm
-                    ${errors.grade ? "border-red-300" : "border-gray-200 hover:border-gray-300"}
-                  `}
-                >
-                  <option value="">Select grade...</option>
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>
-                  ))}
-                </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Grade select */}
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-[#444]">Class *</label>
+                <div className="relative">
+                  <BookOpen size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <select
+                    value={form.grade}
+                    onChange={(e) => setForm({ ...form, grade: e.target.value })}
+                    className={`
+                      w-full rounded-xl border bg-white pl-10 pr-4 py-2.5 text-sm text-[#444]
+                      transition-all duration-200 appearance-none
+                      focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
+                      shadow-inner-sm
+                      ${errors.grade ? "border-red-300" : "border-gray-200 hover:border-gray-300"}
+                    `}
+                  >
+                    <option value="">Select class...</option>
+                    {Array.from({ length: 7 }, (_, i) => i + 6).map((grade) => (
+                      <option key={grade} value={`Class ${grade}`}>Class {grade}</option>
+                    ))}
+                  </select>
+                </div>
+                {errors.grade && <p className="text-xs text-red-500">{errors.grade}</p>}
               </div>
-              {errors.grade && <p className="text-xs text-red-500">{errors.grade}</p>}
+
+              {/* Start Date */}
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-[#444]">Preferred Start Date *</label>
+                <div className="relative">
+                  <Calendar size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    min={today}
+                    value={form.startDate}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    className={`
+                      w-full rounded-xl border bg-white pl-10 pr-4 py-2.5 text-sm text-[#444]
+                      transition-all duration-200 appearance-none
+                      focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
+                      shadow-inner-sm
+                      ${errors.startDate ? "border-red-300" : "border-gray-200 hover:border-gray-300"}
+                    `}
+                  />
+                </div>
+                {errors.startDate && <p className="text-xs text-red-500">{errors.startDate}</p>}
+              </div>
             </div>
 
             <Textarea
