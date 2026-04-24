@@ -57,7 +57,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <motion.button
         ref={ref as React.Ref<HTMLButtonElement>}
         disabled={disabled || loading}
-        whileHover={{ scale: disabled || loading ? 1 : 1.02, brightness: 1.05 }}
+        whileHover={{ scale: disabled || loading ? 1 : 1.02, filter: disabled || loading ? "brightness(1)" : "brightness(1.05)" }}
         whileTap={{ scale: disabled || loading ? 1 : 0.97 }}
         transition={{ type: "spring", stiffness: 500, damping: 30 }}
         onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
