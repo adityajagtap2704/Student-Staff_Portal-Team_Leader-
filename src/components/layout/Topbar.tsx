@@ -48,7 +48,7 @@ export default function Topbar({ session, onMenuClick, title }: TopbarProps) {
           : "0 1px 0 rgba(0,0,0,0.04)",
       }}
       transition={{ duration: 0.2 }}
-      className="h-16 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10 shrink-0"
+      className="h-16 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 sticky top-0 z-50 shrink-0"
     >
       {/* Left */}
       <div className="flex items-center gap-3">

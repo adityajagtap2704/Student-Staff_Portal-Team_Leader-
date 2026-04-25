@@ -9,22 +9,45 @@ import Button from "@/components/ui/Button";
 import { staggerContainer, staggerItem, easeOut } from "@/components/motion/MotionConfig";
 import { useToast } from "@/components/ui/Toast";
 
-type FeeStatus = "Paid" | "Overdue" | "Upcoming";
+import { useState, useEffect } from "react";
 
-const feeRecords: { term: string; amount: string; due: string; paid?: string; status: FeeStatus }[] = [
-  { term: "Term 1 – 2026", amount: "₹8,500", due: "15 Jan 2026", paid: "12 Jan 2026", status: "Paid"     },
-  { term: "Term 2 – 2026", amount: "₹8,500", due: "15 Apr 2026",                      status: "Overdue"  },
-  { term: "Term 3 – 2026", amount: "₹8,500", due: "15 Jul 2026",                      status: "Upcoming" },
-];
+type FeeRecord = {
+  id: number;
+  term: string;
+  amount: number;
+  paidAmount: number;
+  dueDate: string;
+  status: "PAID" | "PENDING" | "OVERDUE";
+};
 
-const statusConfig: Record<FeeStatus, { variant: "success"|"danger"|"neutral"; label: string }> = {
-  Paid:     { variant: "success", label: "Paid"     },
-  Overdue:  { variant: "danger",  label: "Overdue"  },
-  Upcoming: { variant: "neutral", label: "Upcoming" },
+const statusConfig: Record<string, { variant: "success"|"danger"|"neutral"; label: string }> = {
+  PAID:     { variant: "success", label: "Paid"     },
+  OVERDUE:  { variant: "danger",  label: "Overdue"  },
+  PENDING:  { variant: "neutral", label: "Upcoming" },
 };
 
 export default function FeesClient() {
   const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<{ records: FeeRecord[], summary: any } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/fees")
+      .then(res => res.json())
+      .then(d => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="p-10 text-center text-gray-400">Loading your fee details...</div>;
+  if (!data) return <div className="p-10 text-center text-red-500">Failed to load fee information.</div>;
+
+  const { records, summary } = data;
 
   return (
     <div className="space-y-5">
@@ -40,48 +63,49 @@ export default function FeesClient() {
         initial="initial"
         animate="animate"
       >
-        <StatCard label="Total Fees" value="₹25,500" sub="Academic year 2026"
+        <StatCard label="Total Fees" value={`₹${summary.totalDue.toLocaleString()}`} sub="Academic year 2026"
           icon={<CreditCard size={18} className="text-primary" />} iconBg="bg-primary-50" delay={0.05} />
-        <StatCard label="Amount Paid" value="₹8,500" sub="1 of 3 terms"
+        <StatCard label="Amount Paid" value={`₹${summary.totalPaid.toLocaleString()}`} sub="Paid to date"
           icon={<CheckCircle2 size={18} className="text-emerald-600" />} iconBg="bg-emerald-50"
-          badge="Cleared" badgeVariant="success" delay={0.1} />
-        <StatCard label="Outstanding" value="₹17,000" sub="2 terms remaining"
+          badge="Updated" badgeVariant="success" delay={0.1} />
+        <StatCard label="Outstanding" value={`₹${summary.outstanding.toLocaleString()}`} sub="Balance due"
           icon={<AlertCircle size={18} className="text-red-500" />} iconBg="bg-red-50"
-          badge="Action needed" badgeVariant="danger" delay={0.15} />
+          badge={summary.outstanding > 0 ? "Action needed" : "Cleared"} badgeVariant={summary.outstanding > 0 ? "danger" : "success"} delay={0.15} />
       </motion.div>
 
-      {/* Overdue banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...easeOut, delay: 0.2 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-50 to-orange-50 border border-red-100 p-5"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <motion.div
-              className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <AlertCircle size={18} className="text-red-500" />
-            </motion.div>
-            <div>
-              <p className="text-sm font-semibold text-red-700">Term 2 payment overdue</p>
-              <p className="text-xs text-red-500 mt-0.5">₹8,500 was due on 15 Apr 2026. Please pay immediately to avoid penalties.</p>
+      {summary.outstanding > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...easeOut, delay: 0.2 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-50 to-orange-50 border border-red-100 p-5"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <motion.div
+                className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <AlertCircle size={18} className="text-red-500" />
+              </motion.div>
+              <div>
+                <p className="text-sm font-semibold text-red-700">Outstanding payment detected</p>
+                <p className="text-xs text-red-500 mt-0.5">₹{summary.outstanding.toLocaleString()} is remaining. Please pay immediately to avoid penalties.</p>
+              </div>
             </div>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<ArrowUpRight size={14} />}
+              className="shrink-0"
+              onClick={() => toast.success("Redirecting to payment gateway...", "You will be redirected shortly.")}
+            >
+              Pay Now
+            </Button>
           </div>
-          <Button
-            variant="danger"
-            size="sm"
-            icon={<ArrowUpRight size={14} />}
-            className="shrink-0"
-            onClick={() => toast.success("Redirecting to payment gateway...", "You will be redirected shortly.")}
-          >
-            Pay ₹8,500 Now
-          </Button>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* Fee table */}
       <Card title="Payment Schedule" subtitle="All terms for academic year 2026" noPadding delay={0.25}>
@@ -97,12 +121,13 @@ export default function FeesClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {feeRecords.map((row, i) => {
+              {records.map((row, i) => {
                 const cfg = statusConfig[row.status];
-                const isOverdue = row.status === "Overdue";
+                const isOverdue = row.status === "OVERDUE";
+                const isPaid = row.status === "PAID";
                 return (
                   <motion.tr
-                    key={row.term}
+                    key={row.id}
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ ...easeOut, delay: 0.3 + i * 0.07 }}
@@ -112,19 +137,19 @@ export default function FeesClient() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <motion.div
-                          className={`h-2 w-2 rounded-full shrink-0 ${row.status === "Paid" ? "bg-emerald-400" : row.status === "Overdue" ? "bg-red-400" : "bg-gray-300"}`}
+                          className={`h-2 w-2 rounded-full shrink-0 ${isPaid ? "bg-emerald-400" : isOverdue ? "bg-red-400" : "bg-gray-300"}`}
                           animate={isOverdue ? { scale: [1, 1.4, 1] } : {}}
                           transition={{ duration: 1.5, repeat: Infinity }}
                         />
                         <span className="font-medium text-[#444]">{row.term}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-[#444]">{row.amount}</td>
-                    <td className={`px-6 py-4 ${isOverdue ? "text-red-500 font-medium" : "text-gray-400"}`}>{row.due}</td>
-                    <td className="px-6 py-4 text-gray-400">{row.paid ?? "—"}</td>
+                    <td className="px-6 py-4 font-semibold text-[#444]">₹{Number(row.amount).toLocaleString()}</td>
+                    <td className={`px-6 py-4 ${isOverdue ? "text-red-500 font-medium" : "text-gray-400"}`}>{new Date(row.dueDate).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-gray-400">{isPaid ? "Received" : "—"}</td>
                     <td className="px-6 py-4"><Badge variant={cfg.variant} dot>{cfg.label}</Badge></td>
                     <td className="px-6 py-4 text-right">
-                      {row.status === "Paid" ? (
+                      {isPaid ? (
                         <motion.button
                           className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition-colors"
                           whileHover={{ scale: 1.05 }}
@@ -132,7 +157,7 @@ export default function FeesClient() {
                         >
                           <Download size={12} /> Receipt
                         </motion.button>
-                      ) : row.status === "Overdue" ? (
+                      ) : isOverdue ? (
                         <Button variant="danger" size="xs" onClick={() => toast.error("Payment gateway", "Please contact the accounts office.")}>Pay Now</Button>
                       ) : (
                         <span className="text-xs text-gray-300">Not due yet</span>

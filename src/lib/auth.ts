@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import db from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -10,17 +11,22 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        // Replace this with your actual DB/user lookup logic
-        if (
-          credentials?.email === "admin@kalnet.com" &&
-          credentials?.password === "password123"
-        ) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        // Find student by email
+        const student = await db.student.findUnique({
+          where: { email: credentials.email },
+        });
+
+        // Check if student exists AND provided password matches their Roll Number
+        if (student && credentials.password === student.rollNumber) {
           return {
-            id: "1",
-            name: "Admin User",
-            email: "admin@kalnet.com",
+            id: student.id.toString(),
+            name: student.name,
+            email: student.email,
           };
         }
+        
         return null;
       },
     }),

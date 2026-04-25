@@ -102,7 +102,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@kalnet.edu"
+                placeholder="student@example.com"
                 icon={<Mail size={15} />}
                 autoComplete="email"
               />
@@ -120,14 +120,14 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Roll Number (e.g. KN-2024-001)"
                     autoComplete="current-password"
-                    className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 py-2.5 text-sm text-[#444] placeholder:text-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary hover:border-gray-300"
+                    className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-12 py-2.5 text-sm text-[#444] placeholder:text-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary hover:border-gray-300"
                   />
                   <motion.button
                     type="button"
                     onClick={() => setShowPw(!showPw)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     aria-label={showPw ? "Hide password" : "Show password"}
@@ -180,18 +180,7 @@ export default function LoginPage() {
             </motion.div>
           </motion.form>
 
-          {/* Demo credentials */}
-          <motion.div
-            variants={staggerItem}
-            transition={{ ...easeOut, delay: 0.25 }}
-            className="mt-6 p-3.5 bg-gray-50 rounded-xl border border-gray-100"
-          >
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Demo credentials</p>
-            <div className="space-y-1">
-              <p className="text-xs text-gray-400 font-mono">admin@kalnet.com</p>
-              <p className="text-xs text-gray-400 font-mono">password123</p>
-            </div>
-          </motion.div>
+
 
           <motion.p
             variants={staggerItem}

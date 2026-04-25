@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id             Int            @id @default(autoincrement())
+  name           String
+  email          String         @unique
+  phone          String
+  parentName     String
+  classEnrolled  String
+  rollNumber     String         @unique
+  admissionDate  DateTime
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  fees           Fee[]
+  leaveRequests  LeaveRequest[]
+
+  @@map("students")
+}
+
+model Admission {
+  id              Int             @id @default(autoincrement())
+  referenceNumber String          @unique
+  studentName     String
+  parentName      String
+  phone           String
+  classApplied    String
+  status          AdmissionStatus @default(PENDING)
+  submittedAt     DateTime        @default(now())
+
+  @@map("admissions")
+}
+
+enum AdmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Fee {
+  id         Int       @id @default(autoincrement())
+  studentId  Int
+  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term       String
+  dueDate    DateTime
+  amount     Decimal   @db.Decimal(10, 2)
+  paidAmount Decimal   @default(0.00) @db.Decimal(10, 2)
+  type       FeeType
+  status     FeeStatus @default(PENDING)
+
+  @@map("fees")
+}
+
+enum FeeType {
+  Tuition
+  Transport
+  Activity
+}
+
+enum FeeStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
+model Announcement {
+  id          Int                  @id @default(autoincrement())
+  title       String
+  category    AnnouncementCategory
+  description String               @db.Text
+  author      String
+  date        DateTime
+  imageUrl    String?              @db.VarChar(1000)
+  createdAt   DateTime             @default(now())
+
+  @@map("announcements")
+}
+
+enum AnnouncementCategory {
+  Events
+  Exams
+  Holidays
+  General
+}
+
+model LeaveRequest {
+  id          Int                 @id @default(autoincrement())
+  studentId   Int
+  student     Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  leaveType   String
+  fromDate    DateTime
+  toDate      DateTime
+  reason      String              @db.Text
+  status      LeaveRequestStatus @default(PENDING)
+  submittedAt DateTime            @default(now())
+
+  @@map("leave_requests")
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

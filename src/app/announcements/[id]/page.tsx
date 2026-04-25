@@ -1,27 +1,29 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar, User, ChevronRight, Share2 } from "lucide-react";
-import { announcements } from "@/lib/data";
+import db from "@/lib/db";
 
-export default function AnnouncementDetailPage({ params }: { params: { id: string } }) {
-  const announcement = announcements.find((a) => a.id === params.id);
+export default async function AnnouncementDetailPage({ params }: { params: { id: string } }) {
+  const annId = parseInt(params.id);
+  if (isNaN(annId)) notFound();
+
+  const announcement = await db.announcement.findUnique({
+    where: { id: annId },
+  });
 
   if (!announcement) {
     notFound();
   }
 
   // Find related announcements (same category, excluding current, max 3)
-  const related = announcements
-    .filter((a) => a.category === announcement.category && a.id !== announcement.id)
-    .slice(0, 3);
-  
-  // If not enough related, pad with latest ones
-  if (related.length < 3) {
-    const more = announcements
-      .filter((a) => a.id !== announcement.id && !related.find((r) => r.id === a.id))
-      .slice(0, 3 - related.length);
-    related.push(...more);
-  }
+  const related = await db.announcement.findMany({
+    where: { 
+      category: announcement.category as any,
+      id: { not: announcement.id } 
+    },
+    take: 3,
+    orderBy: { date: "desc" }
+  });
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20">

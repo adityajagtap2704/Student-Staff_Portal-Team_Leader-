@@ -16,6 +16,7 @@ export default function LeaveRequestForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [requestId, setRequestId] = useState("");
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -33,10 +34,32 @@ export default function LeaveRequestForm() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    setSubmitted(true);
-    toast.success("Leave request submitted!", "The approval chain has been triggered automatically.");
+    
+    try {
+      const response = await fetch("/api/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit leave request");
+      }
+
+      const data = await response.json();
+      setLoading(false);
+      
+      // Use the real ID from the database (e.g., id 1, 2, 3) 
+      // or format it as LR-0001
+      const formattedId = `LR-${data.id.toString().padStart(4, '0')}`;
+      setRequestId(formattedId);
+      setSubmitted(true);
+      toast.success("Leave request submitted!", `Ref ID: ${formattedId}`);
+    } catch (error) {
+      console.error(error);
+      setErrors({ submit: "Failed to submit request. Please try again." });
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,7 +100,7 @@ export default function LeaveRequestForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...easeOut, delay: 0.25 }}
           >
-            Your leave request has been submitted and the approval chain has been triggered automatically.
+            Your leave request has been submitted with ID <span className="font-mono font-bold text-primary">{requestId}</span>. The approval chain has been triggered automatically.
           </motion.p>
           <motion.div
             className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl text-sm text-emerald-700 font-medium"

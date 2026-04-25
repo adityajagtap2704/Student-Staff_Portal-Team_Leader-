@@ -1,24 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Bell, Calendar, ChevronRight, Filter } from "lucide-react";
 import { motion } from "framer-motion";
-import { announcements, AnnouncementCategory } from "@/lib/data";
 
-const CATEGORIES: AnnouncementCategory[] = ["All", "Events", "Exams", "Holidays", "General"];
+const CATEGORIES = ["All", "Events", "Exams", "Holidays", "General"];
 
 export default function AnnouncementsPage() {
-  const [activeCategory, setActiveCategory] = useState<AnnouncementCategory>("All");
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredAnnouncements = announcements.filter(
-    (a) => activeCategory === "All" || a.category === activeCategory
-  );
+  useEffect(() => {
+    setLoading(true);
+    const url = activeCategory === "All" ? "/api/announcements" : `/api/announcements?category=${activeCategory}`;
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        setAnnouncements(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, [activeCategory]);
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20">
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 pt-8 pb-6 px-4 sticky top-0 z-10">
+      <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 pt-8 pb-6 px-4 sticky top-0 z-40 shadow-sm transition-all duration-300">
         <div className="max-w-5xl mx-auto">
           <Link
             href="/"
@@ -71,10 +83,11 @@ export default function AnnouncementsPage() {
           </div>
         </div>
 
-        {/* Announcements Grid */}
-        {filteredAnnouncements.length > 0 ? (
+        {loading ? (
+          <div className="py-20 text-center text-gray-400">Loading announcements...</div>
+        ) : announcements.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-            {filteredAnnouncements.map((announcement) => (
+            {announcements.map((announcement) => (
               <Link 
                 href={`/announcements/${announcement.id}`} 
                 key={announcement.id}

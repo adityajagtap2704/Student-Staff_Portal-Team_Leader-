@@ -8,9 +8,6 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Input";
 
-function generateRef() {
-  return "KN-ENQ-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-}
 
 export default function AdmissionEnquiryPage() {
   const router = useRouter();
@@ -47,13 +44,28 @@ export default function AdmissionEnquiryPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 1500));
-    const ref = generateRef();
-    setLoading(false);
     
-    // Redirect to confirmation page with ref number
-    router.push(`/admissions/confirmation?ref=${ref}`);
+    try {
+      const response = await fetch("/api/admissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit enquiry");
+      }
+
+      const data = await response.json();
+      setLoading(false);
+      
+      // Redirect to confirmation page with real reference number from DB
+      router.push(`/admissions/confirmation?ref=${data.referenceNumber}`);
+    } catch (error) {
+      console.error(error);
+      setErrors({ submit: "Failed to submit enquiry. Please try again." });
+      setLoading(false);
+    }
   };
 
   // Get today's date for minimum date constraint
