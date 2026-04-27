@@ -116,26 +116,43 @@ export default function AnnouncementsClient({ announcements }: Props) {
                     <motion.div key={a.id} variants={staggerItem} transition={{ ...easeOut, delay: i * 0.06 }}>
                       <Link href={`/dashboard/announcements/${a.id}`}>
                         <motion.div
-                          className="group block bg-white rounded-2xl border border-primary-100 shadow-glow p-5 cursor-pointer"
+                          className="group block bg-white rounded-2xl border border-primary-100 shadow-glow overflow-hidden cursor-pointer"
                           whileHover={{ y: -3, boxShadow: "0 12px 40px rgba(29,158,117,0.15)" }}
                           whileTap={{ scale: 0.99 }}
                           transition={{ type: "spring", stiffness: 400, damping: 25 }}
                         >
-                          <div className="flex items-start justify-between gap-2 mb-3">
-                            <Badge variant={cfg.variant}>{cfg.emoji} {a.category}</Badge>
-                            <span className="text-[10px] text-gray-300 shrink-0">{formatDate(a.date)}</span>
+                          {/* Image / placeholder */}
+                          <div className="relative w-full h-36 overflow-hidden">
+                            {a.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={a.imageUrl}
+                                alt={a.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-primary-50 flex items-center justify-center">
+                                <span className="text-4xl opacity-30">{cfg.emoji}</span>
+                              </div>
+                            )}
                           </div>
-                          <h3 className="font-semibold text-[#444] text-sm leading-snug group-hover:text-primary transition-colors">
-                            {a.title}
-                          </h3>
-                          <p className="mt-1.5 text-xs text-gray-400 line-clamp-2">{a.description}</p>
-                          <motion.div
-                            className="mt-3 flex items-center gap-1 text-xs text-primary font-medium"
-                            initial={{ opacity: 0, x: -4 }}
-                            whileHover={{ opacity: 1, x: 0 }}
-                          >
-                            Read more <ArrowRight size={12} />
-                          </motion.div>
+                          <div className="p-5">
+                            <div className="flex items-start justify-between gap-2 mb-3">
+                              <Badge variant={cfg.variant}>{cfg.emoji} {a.category}</Badge>
+                              <span className="text-[10px] text-gray-300 shrink-0">{formatDate(a.date)}</span>
+                            </div>
+                            <h3 className="font-semibold text-[#444] text-sm leading-snug group-hover:text-primary transition-colors">
+                              {a.title}
+                            </h3>
+                            <p className="mt-1.5 text-xs text-gray-400 line-clamp-2">{a.description}</p>
+                            <motion.div
+                              className="mt-3 flex items-center gap-1 text-xs text-primary font-medium"
+                              initial={{ opacity: 0, x: -4 }}
+                              whileHover={{ opacity: 1, x: 0 }}
+                            >
+                              Read more <ArrowRight size={12} />
+                            </motion.div>
+                          </div>
                         </motion.div>
                       </Link>
                     </motion.div>
@@ -164,18 +181,30 @@ export default function AnnouncementsClient({ announcements }: Props) {
                     <motion.div key={a.id} variants={staggerItem} transition={{ ...easeOut, delay: i * 0.05 }}>
                       <Link href={`/dashboard/announcements/${a.id}`}>
                         <motion.div
-                          className="group flex items-start gap-4 bg-white rounded-2xl border border-gray-100 shadow-card p-4 cursor-pointer"
+                          className="group flex items-start gap-4 bg-white rounded-2xl border border-gray-100 shadow-card p-4 cursor-pointer overflow-hidden"
                           whileHover={{ y: -2, boxShadow: "0 8px 24px rgba(0,0,0,0.07)" }}
                           whileTap={{ scale: 0.99 }}
                           transition={{ type: "spring", stiffness: 400, damping: 25 }}
                         >
-                          <motion.div
-                            className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center text-lg shrink-0"
-                            whileHover={{ scale: 1.1, rotate: 5 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                          >
-                            {cfg.emoji}
-                          </motion.div>
+                          {/* Thumbnail */}
+                          <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0">
+                            {a.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={a.imageUrl}
+                                alt={a.title}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              />
+                            ) : (
+                              <motion.div
+                                className="h-full w-full bg-gray-50 flex items-center justify-center text-lg"
+                                whileHover={{ scale: 1.1, rotate: 5 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                              >
+                                {cfg.emoji}
+                              </motion.div>
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <Badge variant={cfg.variant} size="sm">{a.category}</Badge>

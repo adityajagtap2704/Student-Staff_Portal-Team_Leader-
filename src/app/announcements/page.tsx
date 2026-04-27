@@ -87,46 +87,66 @@ export default function AnnouncementsPage() {
           <div className="py-20 text-center text-gray-400">Loading announcements...</div>
         ) : announcements.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-            {announcements.map((announcement) => (
-              <Link 
-                href={`/announcements/${announcement.id}`} 
-                key={announcement.id}
-                className="group bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:border-primary-100 transition-all duration-300 flex flex-col h-full"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <span className={`
-                    text-xs font-semibold px-3 py-1 rounded-full
-                    ${announcement.category === "Events" ? "bg-amber-100 text-amber-700" : ""}
-                    ${announcement.category === "Exams" ? "bg-red-100 text-red-700" : ""}
-                    ${announcement.category === "Holidays" ? "bg-emerald-100 text-emerald-700" : ""}
-                    ${announcement.category === "General" ? "bg-blue-100 text-blue-700" : ""}
-                  `}>
-                    {announcement.category}
-                  </span>
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
-                    <Calendar size={13} />
-                    {new Date(announcement.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                  </div>
-                </div>
+            {announcements.map((announcement) => {
+              const categoryMeta: Record<string, { bg: string; text: string; placeholder: string; emoji: string }> = {
+                Events:   { bg: "bg-amber-100",   text: "text-amber-700",   placeholder: "bg-amber-50",   emoji: "🎉" },
+                Exams:    { bg: "bg-red-100",      text: "text-red-700",     placeholder: "bg-red-50",     emoji: "📝" },
+                Holidays: { bg: "bg-emerald-100",  text: "text-emerald-700", placeholder: "bg-emerald-50", emoji: "🌴" },
+                General:  { bg: "bg-blue-100",     text: "text-blue-700",    placeholder: "bg-blue-50",    emoji: "📢" },
+              };
+              const meta = categoryMeta[announcement.category] ?? categoryMeta["General"];
 
-                <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                  {announcement.title}
-                </h3>
-                
-                <p className="text-sm text-gray-500 mb-6 flex-1 leading-relaxed">
-                  {announcement.description.length > 60 
-                    ? announcement.description.substring(0, 60).trim() + "..." 
-                    : announcement.description}
-                </p>
-
-                <div className="mt-auto flex items-center justify-between text-sm font-medium pt-4 border-t border-gray-50">
-                  <span className="text-primary group-hover:text-primary-600 transition-colors">Read more</span>
-                  <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-primary-50 group-hover:text-primary transition-colors">
-                    <ChevronRight size={16} />
+              return (
+                <Link
+                  href={`/announcements/${announcement.id}`}
+                  key={announcement.id}
+                  className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-primary-100 transition-all duration-300 flex flex-col h-full overflow-hidden"
+                >
+                  {/* Image / Placeholder */}
+                  <div className="relative w-full h-44 overflow-hidden shrink-0">
+                    {announcement.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={announcement.imageUrl}
+                        alt={announcement.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className={`w-full h-full ${meta.placeholder} flex items-center justify-center`}>
+                        <span className="text-5xl opacity-40">{meta.emoji}</span>
+                      </div>
+                    )}
+                    {/* Category badge overlaid on image */}
+                    <span className={`absolute top-3 left-3 text-xs font-semibold px-3 py-1 rounded-full ${meta.bg} ${meta.text}`}>
+                      {announcement.category}
+                    </span>
                   </div>
-                </div>
-              </Link>
-            ))}
+
+                  {/* Card body */}
+                  <div className="flex flex-col flex-1 p-5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
+                      <Calendar size={12} />
+                      {new Date(announcement.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </div>
+
+                    <h3 className="text-base font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                      {announcement.title}
+                    </h3>
+
+                    <p className="text-sm text-gray-500 flex-1 leading-relaxed line-clamp-2">
+                      {announcement.description}
+                    </p>
+
+                    <div className="mt-4 flex items-center justify-between text-sm font-medium pt-4 border-t border-gray-50">
+                      <span className="text-primary group-hover:text-primary-600 transition-colors">Read more</span>
+                      <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-primary-50 group-hover:text-primary transition-colors">
+                        <ChevronRight size={16} />
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm text-center">
