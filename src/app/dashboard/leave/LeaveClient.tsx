@@ -8,13 +8,17 @@ import Badge from "@/components/ui/Badge";
 import LeaveRequestForm from "./LeaveRequestForm";
 import { staggerContainer, easeOut } from "@/components/motion/MotionConfig";
 
-const leaveHistory = [
-  { reason: "Medical appointment", from: "10 Jan 2026", to: "10 Jan 2026", days: 1, status: "Approved", variant: "success" as const },
-  { reason: "Family function",     from: "22 Feb 2026", to: "23 Feb 2026", days: 2, status: "Pending",  variant: "warning" as const },
-  { reason: "Personal work",       from: "05 Mar 2026", to: "05 Mar 2026", days: 1, status: "Rejected", variant: "danger"  as const },
-];
+interface Props {
+  initialData: any[];
+  stats: {
+    total: number;
+    approved: number;
+    pending: number;
+    daysTaken: number;
+  };
+}
 
-export default function LeaveClient() {
+export default function LeaveClient({ initialData, stats }: Props) {
   return (
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={easeOut}>
@@ -28,12 +32,12 @@ export default function LeaveClient() {
         initial="initial"
         animate="animate"
       >
-        <StatCard label="Total Requests" value="3" sub="This academic year"
+        <StatCard label="Total Requests" value={stats.total.toString()} sub="This academic year"
           icon={<CalendarOff size={18} className="text-primary" />} iconBg="bg-primary-50" delay={0.05} />
-        <StatCard label="Approved" value="1" sub="1 day taken"
+        <StatCard label="Approved" value={stats.approved.toString()} sub={`${stats.daysTaken} days taken`}
           icon={<CheckCircle2 size={18} className="text-emerald-600" />} iconBg="bg-emerald-50"
           badge="Cleared" badgeVariant="success" delay={0.1} />
-        <StatCard label="Pending" value="1" sub="Awaiting review"
+        <StatCard label="Pending" value={stats.pending.toString()} sub="Awaiting review"
           icon={<Clock size={18} className="text-amber-500" />} iconBg="bg-amber-50"
           badge="In review" badgeVariant="warning" delay={0.15} />
       </motion.div>
@@ -53,22 +57,33 @@ export default function LeaveClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {leaveHistory.map((row, i) => (
-                <motion.tr
-                  key={i}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ ...easeOut, delay: 0.35 + i * 0.07 }}
-                  whileHover={{ backgroundColor: "rgba(249,250,251,0.8)" }}
-                  className="transition-colors"
-                >
-                  <td className="px-6 py-4 font-medium text-[#444]">{row.reason}</td>
-                  <td className="px-6 py-4 text-gray-400">{row.from}</td>
-                  <td className="px-6 py-4 text-gray-400">{row.to}</td>
-                  <td className="px-6 py-4 text-gray-400">{row.days}d</td>
-                  <td className="px-6 py-4"><Badge variant={row.variant} dot>{row.status}</Badge></td>
-                </motion.tr>
-              ))}
+              {initialData.map((row, i) => {
+                const diff = new Date(row.toDate).getTime() - new Date(row.fromDate).getTime();
+                const days = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+                const statusVariant = row.status === "APPROVED" ? "success" : row.status === "REJECTED" ? "danger" : "warning";
+                
+                return (
+                  <motion.tr
+                    key={row.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ ...easeOut, delay: 0.35 + i * 0.07 }}
+                    whileHover={{ backgroundColor: "rgba(249,250,251,0.8)" }}
+                    className="transition-colors"
+                  >
+                    <td className="px-6 py-4 font-medium text-[#444]">{row.reason}</td>
+                    <td className="px-6 py-4 text-gray-400">{new Date(row.fromDate).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-gray-400">{new Date(row.toDate).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-gray-400">{days}d</td>
+                    <td className="px-6 py-4"><Badge variant={statusVariant} dot>{row.status.charAt(0) + row.status.slice(1).toLowerCase()}</Badge></td>
+                  </motion.tr>
+                );
+              })}
+              {initialData.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No leave requests found.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

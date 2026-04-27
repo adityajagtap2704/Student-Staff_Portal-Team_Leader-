@@ -33,11 +33,7 @@ export default function Topbar({ session, onMenuClick, title }: TopbarProps) {
   const initials = session?.user?.name
     ?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "U";
 
-  const notifications = [
-    { id: 1, text: "Term 2 fee payment overdue", time: "2h ago", dot: "bg-red-400" },
-    { id: 2, text: "Leave request approved",     time: "1d ago", dot: "bg-emerald-400" },
-    { id: 3, text: "New announcement posted",    time: "2d ago", dot: "bg-blue-400" },
-  ];
+  const notifications: any[] = [];
 
   return (
     <motion.header
@@ -124,7 +120,7 @@ export default function Topbar({ session, onMenuClick, title }: TopbarProps) {
                   <div className="px-4 py-3 border-b border-gray-50">
                     <p className="text-sm font-semibold text-[#444]">Notifications</p>
                   </div>
-                  <ul className="divide-y divide-gray-50">
+                  <ul className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
                     {notifications.map((n, i) => (
                       <motion.li
                         key={n.id}
@@ -140,6 +136,11 @@ export default function Topbar({ session, onMenuClick, title }: TopbarProps) {
                         </div>
                       </motion.li>
                     ))}
+                    {notifications.length === 0 && (
+                      <li className="px-4 py-8 text-center">
+                        <p className="text-xs text-gray-400">No new notifications</p>
+                      </li>
+                    )}
                   </ul>
                   <div className="px-4 py-2.5 border-t border-gray-50">
                     <button className="text-xs text-primary hover:text-primary-600 font-medium transition-colors">

@@ -28,9 +28,17 @@ interface Props {
     badge: "success"|"warning"|"info"|"danger"; badgeLabel: string;
   }[];
   quickLinks: { href: string; label: string; icon: string; color: string; bg: string }[];
+  stats: {
+    totalFees: string;
+    paid: string;
+    outstanding: string;
+    paidPercent: number;
+    termCount: number;
+    academicYear: number;
+  };
 }
 
-export default function DashboardClient({ session, greeting, activity, quickLinks }: Props) {
+export default function DashboardClient({ session, greeting, activity, quickLinks, stats }: Props) {
   return (
     <div className="space-y-5">
       {/* Hero greeting */}
@@ -43,7 +51,7 @@ export default function DashboardClient({ session, greeting, activity, quickLink
         <div className="absolute inset-0 bg-mesh-pattern opacity-30" />
         <div className="relative">
           <p className="text-sm text-white/70 font-medium">{greeting} 👋</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             {session.user?.name?.split(" ")[0] ?? "Student"}
           </h1>
           <p className="mt-1 text-sm text-white/70">
@@ -66,15 +74,15 @@ export default function DashboardClient({ session, greeting, activity, quickLink
         initial="initial"
         animate="animate"
       >
-        <StatCard label="Total Fees" value="₹25,500" sub="Academic year 2026"
+        <StatCard label="Total Fees" value={stats.totalFees} sub={`Academic year ${stats.academicYear}`}
           icon={<CreditCard size={18} className="text-primary" />} iconBg="bg-primary-50"
-          badge="3 Terms" badgeVariant="primary" delay={0.05} />
-        <StatCard label="Paid" value="₹8,500" sub="Term 1 cleared"
+          badge={`${stats.termCount} Records`} badgeVariant="primary" delay={0.05} />
+        <StatCard label="Paid" value={stats.paid} sub="Paid to date"
           icon={<CheckCircle2 size={18} className="text-emerald-600" />} iconBg="bg-emerald-50"
-          badge="On time" badgeVariant="success" trend={{ value: "33%", up: true }} delay={0.1} />
-        <StatCard label="Outstanding" value="₹17,000" sub="Terms 2 & 3 pending"
+          badge="On time" badgeVariant="success" trend={{ value: `${stats.paidPercent}%`, up: true }} delay={0.1} />
+        <StatCard label="Outstanding" value={stats.outstanding} sub="Pending dues"
           icon={<AlertCircle size={18} className="text-red-500" />} iconBg="bg-red-50"
-          badge="Due soon" badgeVariant="danger" delay={0.15} />
+          badge={stats.outstanding !== "₹0" ? "Due soon" : "Cleared"} badgeVariant={stats.outstanding !== "₹0" ? "danger" : "success"} delay={0.15} />
       </motion.div>
 
       {/* Quick actions */}

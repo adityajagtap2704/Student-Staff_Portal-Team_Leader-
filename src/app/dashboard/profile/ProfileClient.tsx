@@ -2,33 +2,41 @@
 
 import { motion } from "framer-motion";
 import { Session } from "next-auth";
-import { Mail, Phone, MapPin, Calendar, Hash, BookOpen, Edit3 } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Hash, BookOpen, Edit3, User } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { staggerContainer, staggerItem, easeOut } from "@/components/motion/MotionConfig";
 import { useToast } from "@/components/ui/Toast";
 
-const details = [
-  { icon: Hash,      label: "Roll Number",    value: "KN-2026-001"          },
-  { icon: BookOpen,  label: "Class",          value: "Grade 10 – Section A" },
-  { icon: Calendar,  label: "Date of Birth",  value: "01 January 2010"      },
-  { icon: Phone,     label: "Contact",        value: "+91 98765 43210"      },
-  { icon: MapPin,    label: "Address",        value: "123, MG Road, Pune"   },
-  { icon: Calendar,  label: "Admission Year", value: "2021"                 },
-];
+interface Props {
+  student: any;
+}
 
-const stats = [
-  { label: "Attendance", value: "92%", color: "text-emerald-600", bg: "bg-emerald-50" },
-  { label: "Avg. Grade", value: "A",   color: "text-primary",     bg: "bg-primary-50" },
-  { label: "Rank",       value: "#5",  color: "text-purple-600",  bg: "bg-purple-50"  },
-  { label: "Subjects",   value: "8",   color: "text-blue-600",    bg: "bg-blue-50"    },
-];
-
-export default function ProfileClient({ session }: { session: Session }) {
+export default function ProfileClient({ student }: Props) {
   const toast = useToast();
-  const user = session.user;
-  const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "U";
+  const initials = student.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "U";
+
+  const details = [
+    { icon: Hash,      label: "Roll Number",    value: student.rollNumber          },
+    { icon: BookOpen,  label: "Class",          value: student.classEnrolled       },
+    { icon: User,      label: "Parent Name",    value: student.parentName          },
+    { icon: Phone,     label: "Contact",        value: student.phone               },
+    { icon: Mail,      label: "Email",          value: student.email               },
+    { icon: Calendar,  label: "Admission Date", value: new Date(student.admissionDate).toLocaleDateString() },
+  ];
+
+  const approvedLeave = student.leaveRequests.filter((r: any) => r.status === "APPROVED");
+  const attendance = "N/A"; // Not tracked in current schema
+  const totalFees = student.fees.reduce((acc: number, f: any) => acc + Number(f.amount), 0);
+  const paidFees = student.fees.reduce((acc: number, f: any) => acc + Number(f.paidAmount), 0);
+
+  const stats = [
+    { label: "Attendance", value: attendance, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "Leaves",     value: approvedLeave.length.toString(), color: "text-amber-600", bg: "bg-amber-50" },
+    { label: "Fee Status", value: totalFees === paidFees ? "Cleared" : "Pending", color: totalFees === paidFees ? "text-emerald-600" : "text-red-600", bg: totalFees === paidFees ? "bg-emerald-50" : "bg-red-50" },
+    { label: "Status",     value: student.isActive ? "Active" : "Inactive", color: student.isActive ? "text-primary" : "text-gray-600", bg: "bg-gray-50" },
+  ];
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -69,25 +77,27 @@ export default function ProfileClient({ session }: { session: Session }) {
             <div className="h-20 w-20 rounded-2xl bg-gradient-primary flex items-center justify-center text-white text-2xl font-bold shadow-glow-lg select-none">
               {initials}
             </div>
-            <motion.div
-              className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-400 border-2 border-white flex items-center justify-center"
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <div className="h-2 w-2 rounded-full bg-white" />
-            </motion.div>
+            {student.isActive && (
+              <motion.div
+                className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-400 border-2 border-white flex items-center justify-center"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <div className="h-2 w-2 rounded-full bg-white" />
+              </motion.div>
+            )}
           </motion.div>
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold text-[#444]">{user?.name ?? "Student"}</h2>
-              <Badge variant="primary" dot>Active</Badge>
+              <h2 className="text-xl font-bold text-[#444]">{student.name}</h2>
+              <Badge variant={student.isActive ? "success" : "neutral"} dot>{student.isActive ? "Active" : "Inactive"}</Badge>
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-400">
               <Mail size={13} />
-              <span>{user?.email ?? "—"}</span>
+              <span>{student.email}</span>
             </div>
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {["Student", "Grade 10 – A", "Roll: KN-2026-001"].map((tag) => (
+              {["Student", student.classEnrolled, `Roll: ${student.rollNumber}`].map((tag) => (
                 <motion.span
                   key={tag}
                   className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium"
