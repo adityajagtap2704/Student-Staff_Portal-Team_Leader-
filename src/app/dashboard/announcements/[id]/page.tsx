@@ -4,16 +4,17 @@ import { redirect, notFound } from "next/navigation";
 import PageLayout from "@/components/layout/PageLayout";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, User } from "lucide-react";
+import db from "@/lib/db";
 
-const announcements = [
-  { id: "1", title: "Annual Sports Day – 30 April 2026", body: "All students are requested to participate in the Annual Sports Day event. Registration closes on 25 April. Prizes for top performers in each category.\n\nThe event will be held at the school grounds from 8 AM to 4 PM. Students are requested to wear their house colours. Parents are welcome to attend.\n\nFor registration, visit the sports office or fill the online form on the portal.", date: "21 Apr 2026", tag: "Event", tagVariant: "info" as const, emoji: "🎉" },
-  { id: "2", title: "Term 2 Fee Payment Reminder", body: "Term 2 fees of ₹8,500 are due by 15 April 2026. Please ensure timely payment to avoid late charges and account suspension.\n\nPayment can be made online via the Fees section of this portal, or at the accounts office between 9 AM and 3 PM on weekdays.\n\nFor any queries, contact fees@kalnet.edu.", date: "18 Apr 2026", tag: "Finance", tagVariant: "warning" as const, emoji: "💰" },
-  { id: "3", title: "Summer Vacation Schedule 2026", body: "School will remain closed from 1 May to 15 June 2026 for summer vacation. Online classes will continue for Grades 9–12.", date: "15 Apr 2026", tag: "Holiday", tagVariant: "success" as const, emoji: "🌴" },
-  { id: "4", title: "Parent-Teacher Meeting – 28 April", body: "PTM is scheduled for 28 April 2026. Parents are requested to attend between 9 AM and 1 PM. Slot booking opens on 22 April.", date: "10 Apr 2026", tag: "Meeting", tagVariant: "primary" as const, emoji: "📋" },
-  { id: "5", title: "Board Exam Timetable Released", body: "The board examination timetable for Grade 10 and 12 has been released. Students can download it from the academic portal.", date: "05 Apr 2026", tag: "Academic", tagVariant: "purple" as const, emoji: "📚" },
-  { id: "6", title: "Library Timings Updated", body: "The school library will now be open from 8 AM to 6 PM on weekdays. Weekend access requires prior permission from the librarian.", date: "01 Apr 2026", tag: "General", tagVariant: "neutral" as const, emoji: "📢" },
-];
+type Category = "Events" | "Exams" | "Holidays" | "General";
+
+const categoryConfig: Record<Category, { variant: "info" | "warning" | "success" | "neutral"; emoji: string }> = {
+  Events:   { variant: "info",    emoji: "🎉" },
+  Exams:    { variant: "warning", emoji: "📝" },
+  Holidays: { variant: "success", emoji: "🌴" },
+  General:  { variant: "neutral", emoji: "📢" },
+};
 
 export default async function AnnouncementDetailPage({
   params,
@@ -23,10 +24,29 @@ export default async function AnnouncementDetailPage({
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const announcement = announcements.find((a) => a.id === params.id);
+  const annId = parseInt(params.id);
+  if (isNaN(annId)) notFound();
+
+  const announcement = await db.announcement.findUnique({
+    where: { id: annId },
+  });
+
   if (!announcement) notFound();
 
-  const related = announcements.filter((a) => a.id !== params.id).slice(0, 3);
+  // Related: same category, excluding current, latest 3
+  const related = await db.announcement.findMany({
+    where: {
+      category: announcement.category,
+      id: { not: announcement.id },
+    },
+    orderBy: { date: "desc" },
+    take: 3,
+  });
+
+  const cfg = categoryConfig[announcement.category as Category];
+
+  const formatDate = (date: Date) =>
+    new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
   return (
     <PageLayout session={session} title="Announcement">
@@ -43,10 +63,21 @@ export default async function AnnouncementDetailPage({
 
         {/* Article */}
         <article className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
+          {/* Featured image if present */}
+          {announcement.imageUrl && (
+            <div className="w-full h-48 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={announcement.imageUrl}
+                alt={announcement.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-3 mb-4">
-              <Badge variant={announcement.tagVariant}>
-                {announcement.emoji} {announcement.tag}
+              <Badge variant={cfg.variant}>
+                {cfg.emoji} {announcement.category}
               </Badge>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#444] leading-snug">
@@ -55,15 +86,15 @@ export default async function AnnouncementDetailPage({
             <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
               <span className="flex items-center gap-1">
                 <Calendar size={12} />
-                {announcement.date}
+                {formatDate(announcement.date)}
               </span>
               <span className="flex items-center gap-1">
-                <Tag size={12} />
-                {announcement.tag}
+                <User size={12} />
+                {announcement.author}
               </span>
             </div>
             <div className="mt-6 pt-6 border-t border-gray-50">
-              {announcement.body.split("\n\n").map((para, i) => (
+              {announcement.description.split("\n").map((para, i) => (
                 <p key={i} className="text-sm text-gray-600 leading-relaxed mb-4 last:mb-0">
                   {para}
                 </p>
@@ -79,22 +110,25 @@ export default async function AnnouncementDetailPage({
               More Announcements
             </p>
             <div className="space-y-2">
-              {related.map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/dashboard/announcements/${a.id}`}
-                  className="group flex items-center gap-3 bg-white rounded-xl border border-gray-100 shadow-card p-4 hover:shadow-soft hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  <span className="text-lg">{a.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#444] group-hover:text-primary transition-colors truncate">
-                      {a.title}
-                    </p>
-                    <p className="text-xs text-gray-400">{a.date}</p>
-                  </div>
-                  <ArrowLeft size={14} className="text-gray-300 group-hover:text-primary rotate-180 transition-colors shrink-0" />
-                </Link>
-              ))}
+              {related.map((a) => {
+                const relCfg = categoryConfig[a.category as Category];
+                return (
+                  <Link
+                    key={a.id}
+                    href={`/dashboard/announcements/${a.id}`}
+                    className="group flex items-center gap-3 bg-white rounded-xl border border-gray-100 shadow-card p-4 hover:shadow-soft hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    <span className="text-lg">{relCfg.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#444] group-hover:text-primary transition-colors truncate">
+                        {a.title}
+                      </p>
+                      <p className="text-xs text-gray-400">{formatDate(a.date)}</p>
+                    </div>
+                    <ArrowLeft size={14} className="text-gray-300 group-hover:text-primary rotate-180 transition-colors shrink-0" />
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
