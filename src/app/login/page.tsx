@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,11 +12,22 @@ import { staggerContainer, staggerItem, easeOut } from "@/components/motion/Moti
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
+
+  // Fix #16 — redirect already-authenticated users away from login
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const role = (session.user as any).role;
+      if (role === "HOD")           router.replace("/dashboard/hod");
+      else if (role === "CLASS_TEACHER") router.replace("/dashboard/staff");
+      else                          router.replace("/dashboard");
+    }
+  }, [status, session, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +38,13 @@ export default function LoginPage() {
     if (result?.error) {
       setError("Invalid email or password. Please try again.");
     } else {
-      router.push("/dashboard");
+      // Fix #1 — redirect by role after login
+      const res  = await fetch("/api/auth/session");
+      const data = await res.json();
+      const role = data?.user?.role;
+      if (role === "HOD")                router.push("/dashboard/hod");
+      else if (role === "CLASS_TEACHER") router.push("/dashboard/staff");
+      else                               router.push("/dashboard");
     }
   };
 

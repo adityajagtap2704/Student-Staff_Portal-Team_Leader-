@@ -4,16 +4,22 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Input, { Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { CheckCircle2, Send, CalendarDays, FileText, Tag } from "lucide-react";
+import Badge from "@/components/ui/Badge";
+import { CheckCircle2, Send, CalendarDays, Tag, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { easeOut, staggerContainer, staggerItem } from "@/components/motion/MotionConfig";
+import { easeOut } from "@/components/motion/MotionConfig";
+import type { LeaveBalance } from "@/lib/leaveBalance";
 
 const leaveTypes = ["Medical / Health", "Family Function", "Personal Work", "Bereavement", "Academic Event", "Other"];
 
-export default function LeaveRequestForm() {
+interface Props {
+  balance: LeaveBalance;
+}
+
+export default function LeaveRequestForm({ balance }: Props) {
   const toast = useToast();
-  const [form, setForm] = useState({ type: "", from: "", to: "", reason: "" });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [form, setForm]       = useState({ type: "", from: "", to: "", reason: "" });
+  const [errors, setErrors]   = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [requestId, setRequestId] = useState("");
@@ -34,30 +40,33 @@ export default function LeaveRequestForm() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
-    
+
     try {
       const response = await fetch("/api/leave", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body:    JSON.stringify(form),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to submit leave request");
+        if (response.status === 422) {
+          setErrors({ submit: data.error });
+        } else {
+          setErrors({ submit: "Failed to submit request. Please try again." });
+        }
+        setLoading(false);
+        return;
       }
 
-      const data = await response.json();
-      setLoading(false);
-      
-      // Use the real ID from the database (e.g., id 1, 2, 3) 
-      // or format it as LR-0001
-      const formattedId = `LR-${data.id.toString().padStart(4, '0')}`;
+      const formattedId = `LR-${data.id.toString().padStart(4, "0")}`;
       setRequestId(formattedId);
       setSubmitted(true);
       toast.success("Leave request submitted!", `Ref ID: ${formattedId}`);
-    } catch (error) {
-      console.error(error);
+    } catch {
       setErrors({ submit: "Failed to submit request. Please try again." });
+    } finally {
       setLoading(false);
     }
   };
@@ -73,54 +82,23 @@ export default function LeaveRequestForm() {
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
           className="bg-white rounded-2xl border border-gray-100 shadow-card p-8 text-center"
         >
-          <motion.div
-            className="mx-auto h-16 w-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.1 }}
-          >
-            <motion.div
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-            >
-              <CheckCircle2 size={32} className="text-emerald-500" />
-            </motion.div>
-          </motion.div>
-          <motion.h3
-            className="text-lg font-semibold text-[#444]"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...easeOut, delay: 0.2 }}
-          >
-            Request Submitted!
-          </motion.h3>
-          <motion.p
-            className="mt-2 text-sm text-gray-400 max-w-sm mx-auto"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...easeOut, delay: 0.25 }}
-          >
-            Your leave request has been submitted with ID <span className="font-mono font-bold text-primary">{requestId}</span>. The approval chain has been triggered automatically.
-          </motion.p>
-          <motion.div
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl text-sm text-emerald-700 font-medium"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...easeOut, delay: 0.3 }}
-          >
+          <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+            <CheckCircle2 size={32} className="text-emerald-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-[#444]">Request Submitted!</h3>
+          <p className="mt-2 text-sm text-gray-400 max-w-sm mx-auto">
+            Your leave request has been submitted with ID{" "}
+            <span className="font-mono font-bold text-primary">{requestId}</span>.
+          </p>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl text-sm text-emerald-700 font-medium">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             Awaiting approval
-          </motion.div>
-          <motion.div
-            className="mt-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ ...easeOut, delay: 0.35 }}
-          >
+          </div>
+          <div className="mt-6">
             <Button variant="outline" size="sm" onClick={() => { setSubmitted(false); setForm({ type: "", from: "", to: "", reason: "" }); }}>
               Submit another request
             </Button>
-          </motion.div>
+          </div>
         </motion.div>
       ) : (
         <motion.div
@@ -131,12 +109,29 @@ export default function LeaveRequestForm() {
           transition={easeOut}
           className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-gray-50">
-            <h3 className="text-sm font-semibold text-[#444]">New Leave Request</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Fill in the details below to submit your request</p>
+          <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-[#444]">New Leave Request</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Fill in the details below to submit your request</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={balance.monthlyRemaining === 0 ? "danger" : balance.monthlyRemaining === 1 ? "warning" : "success"} dot>
+                {balance.monthlyRemaining}d this month
+              </Badge>
+              <Badge variant={balance.yearlyRemaining <= 2 ? "danger" : balance.yearlyRemaining <= 5 ? "warning" : "success"} dot>
+                {balance.yearlyRemaining}d this year
+              </Badge>
+            </div>
           </div>
+
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Leave type */}
+            {errors.submit && (
+              <div className="flex items-start gap-2 px-3.5 py-2.5 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                {errors.submit}
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-[#444]">Leave Type</label>
               <div className="relative">
@@ -150,14 +145,7 @@ export default function LeaveRequestForm() {
                   {leaveTypes.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <AnimatePresence>
-                {errors.type && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                    className="text-xs text-red-500"
-                  >{errors.type}</motion.p>
-                )}
-              </AnimatePresence>
+              {errors.type && <p className="text-xs text-red-500">{errors.type}</p>}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -176,7 +164,12 @@ export default function LeaveRequestForm() {
 
             <div className="flex items-center justify-between pt-1">
               <p className="text-xs text-gray-400">Requests are reviewed within 24 hours</p>
-              <Button type="submit" loading={loading} icon={<Send size={14} />}>
+              <Button
+                type="submit"
+                loading={loading}
+                disabled={balance.monthlyRemaining === 0 || balance.yearlyRemaining === 0}
+                icon={<Send size={14} />}
+              >
                 Submit Request
               </Button>
             </div>

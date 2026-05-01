@@ -1,11 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Session } from "next-auth";
-import { Mail, Phone, MapPin, Calendar, Hash, BookOpen, Edit3, User } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Phone, Calendar, Hash, BookOpen, Edit3, User, X, Save } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import { staggerContainer, staggerItem, easeOut } from "@/components/motion/MotionConfig";
 import { useToast } from "@/components/ui/Toast";
 
@@ -13,30 +14,66 @@ interface Props {
   student: any;
 }
 
-export default function ProfileClient({ student }: Props) {
-  const toast = useToast();
+export default function ProfileClient({ student: initialStudent }: Props) {
+  const toast    = useToast();
+  const [student, setStudent]   = useState(initialStudent);
+  const [editing, setEditing]   = useState(false);
+  const [saving,  setSaving]    = useState(false);
+  const [form,    setForm]      = useState({ phone: student.phone, parentName: student.parentName });
+  const [errors,  setErrors]    = useState<Record<string, string>>({});
+
   const initials = student.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "U";
 
   const details = [
-    { icon: Hash,      label: "Roll Number",    value: student.rollNumber          },
-    { icon: BookOpen,  label: "Class",          value: student.classEnrolled       },
-    { icon: User,      label: "Parent Name",    value: student.parentName          },
-    { icon: Phone,     label: "Contact",        value: student.phone               },
-    { icon: Mail,      label: "Email",          value: student.email               },
-    { icon: Calendar,  label: "Admission Date", value: new Date(student.admissionDate).toLocaleDateString() },
+    { icon: Hash,      label: "Roll Number",    value: student.rollNumber,    editable: false },
+    { icon: BookOpen,  label: "Class",          value: student.classEnrolled, editable: false },
+    { icon: User,      label: "Parent Name",    value: student.parentName,    editable: true,  field: "parentName" },
+    { icon: Phone,     label: "Contact",        value: student.phone,         editable: true,  field: "phone"      },
+    { icon: Mail,      label: "Email",          value: student.email,         editable: false },
+    { icon: Calendar,  label: "Admission Date", value: new Date(student.admissionDate).toLocaleDateString(), editable: false },
   ];
 
   const approvedLeave = student.leaveRequests.filter((r: any) => r.status === "APPROVED");
-  const attendance = "N/A"; // Not tracked in current schema
-  const totalFees = student.fees.reduce((acc: number, f: any) => acc + Number(f.amount), 0);
-  const paidFees = student.fees.reduce((acc: number, f: any) => acc + Number(f.paidAmount), 0);
+  const totalFees     = student.fees.reduce((acc: number, f: any) => acc + Number(f.amount), 0);
+  const paidFees      = student.fees.reduce((acc: number, f: any) => acc + Number(f.paidAmount), 0);
 
   const stats = [
-    { label: "Attendance", value: attendance, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Leaves",     value: approvedLeave.length.toString(), color: "text-amber-600", bg: "bg-amber-50" },
-    { label: "Fee Status", value: totalFees === paidFees ? "Cleared" : "Pending", color: totalFees === paidFees ? "text-emerald-600" : "text-red-600", bg: totalFees === paidFees ? "bg-emerald-50" : "bg-red-50" },
-    { label: "Status",     value: student.isActive ? "Active" : "Inactive", color: student.isActive ? "text-primary" : "text-gray-600", bg: "bg-gray-50" },
+    { label: "Attendance", value: "N/A",                                                    color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "Leaves",     value: approvedLeave.length.toString(),                          color: "text-amber-600",   bg: "bg-amber-50"   },
+    { label: "Fee Status", value: totalFees === paidFees ? "Cleared" : "Pending",           color: totalFees === paidFees ? "text-emerald-600" : "text-red-600", bg: totalFees === paidFees ? "bg-emerald-50" : "bg-red-50" },
+    { label: "Status",     value: student.isActive ? "Active" : "Inactive",                color: student.isActive ? "text-primary" : "text-gray-600", bg: "bg-gray-50" },
   ];
+
+  const validateForm = () => {
+    const e: Record<string, string> = {};
+    if (!form.phone.trim())      e.phone      = "Phone is required";
+    else if (!/^\d{10}$/.test(form.phone.replace(/\D/g, ""))) e.phone = "Must be 10 digits";
+    if (!form.parentName.trim()) e.parentName = "Parent name is required";
+    return e;
+  };
+
+  const handleSave = async () => {
+    const errs = validateForm();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
+    setSaving(true);
+
+    const res = await fetch("/api/profile", {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(form),
+    });
+
+    setSaving(false);
+    if (res.ok) {
+      const updated = await res.json();
+      setStudent((prev: any) => ({ ...prev, phone: updated.phone, parentName: updated.parentName }));
+      setEditing(false);
+      toast.success("Profile updated", "Your changes have been saved.");
+    } else {
+      toast.error("Update failed", "Please try again.");
+    }
+  };
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -51,12 +88,12 @@ export default function ProfileClient({ student }: Props) {
           <p className="mt-1 text-sm text-gray-400">Your personal and academic information.</p>
         </div>
         <Button
-          variant="outline"
+          variant={editing ? "danger" : "outline"}
           size="sm"
-          icon={<Edit3 size={14} />}
-          onClick={() => toast.info("Edit profile", "Profile editing coming soon.")}
+          icon={editing ? <X size={14} /> : <Edit3 size={14} />}
+          onClick={() => { setEditing(!editing); setErrors({}); setForm({ phone: student.phone, parentName: student.parentName }); }}
         >
-          Edit Profile
+          {editing ? "Cancel" : "Edit Profile"}
         </Button>
       </motion.div>
 
@@ -113,14 +150,20 @@ export default function ProfileClient({ student }: Props) {
       </motion.div>
 
       {/* Details */}
-      <Card title="Personal Details" subtitle="Academic and contact information" delay={0.1}>
+      <Card title="Personal Details" subtitle="Academic and contact information" delay={0.1}
+        action={editing ? (
+          <Button size="sm" icon={<Save size={14} />} loading={saving} onClick={handleSave}>
+            Save Changes
+          </Button>
+        ) : undefined}
+      >
         <motion.dl
           className="grid grid-cols-1 sm:grid-cols-2 gap-2"
           variants={staggerContainer}
           initial="initial"
           animate="animate"
         >
-          {details.map(({ icon: Icon, label, value }) => (
+          {details.map(({ icon: Icon, label, value, editable, field }) => (
             <motion.div
               key={label}
               variants={staggerItem}
@@ -135,9 +178,20 @@ export default function ProfileClient({ student }: Props) {
               >
                 <Icon size={14} className="text-gray-400 group-hover:text-primary transition-colors" />
               </motion.div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <dt className="text-xs text-gray-400 font-medium">{label}</dt>
-                <dd className="mt-0.5 text-sm font-medium text-[#444]">{value}</dd>
+                {editing && editable && field ? (
+                  <div className="mt-1">
+                    <input
+                      value={form[field as keyof typeof form]}
+                      onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                      className={`w-full rounded-lg border px-2.5 py-1.5 text-sm text-[#444] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all ${errors[field] ? "border-red-300" : "border-gray-200"}`}
+                    />
+                    {errors[field] && <p className="text-[10px] text-red-500 mt-0.5">{errors[field]}</p>}
+                  </div>
+                ) : (
+                  <dd className="mt-0.5 text-sm font-medium text-[#444]">{value}</dd>
+                )}
               </div>
             </motion.div>
           ))}

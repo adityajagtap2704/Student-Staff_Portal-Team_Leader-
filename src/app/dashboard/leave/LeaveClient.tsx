@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarOff, CheckCircle2, Clock } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import LeaveRequestForm from "./LeaveRequestForm";
 import { staggerContainer, easeOut } from "@/components/motion/MotionConfig";
+import { useToast } from "@/components/ui/Toast";
+import type { LeaveBalance } from "@/lib/leaveBalance";
 
 interface Props {
   initialData: any[];
@@ -16,16 +20,36 @@ interface Props {
     pending: number;
     daysTaken: number;
   };
+  balance: LeaveBalance;
 }
 
-export default function LeaveClient({ initialData, stats }: Props) {
+export default function LeaveClient({ initialData, stats, balance }: Props) {
+  const toast = useToast();
+  const [data, setData] = useState(initialData);
+
+  const monthlyPct = Math.round((balance.monthlyUsed / balance.monthlyLimit) * 100);
+  const yearlyPct  = Math.round((balance.yearlyUsed  / balance.yearlyLimit)  * 100);
+
+  // Fix #14 — cancel a PENDING leave request
+  const handleCancel = async (id: number) => {
+    const res = await fetch(`/api/leave/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setData(prev => prev.filter(r => r.id !== id));
+      toast.success("Request cancelled", "Your leave request has been removed.");
+    } else {
+      const err = await res.json();
+      toast.error("Cannot cancel", err.error ?? "Please try again.");
+    }
+  };
+
   return (
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={easeOut}>
         <h1 className="text-2xl font-bold text-[#444] tracking-tight">Leave Requests</h1>
-        <p className="mt-1 text-sm text-gray-400">Submit and track your leave requests. Approvals are processed automatically.</p>
+        <p className="mt-1 text-sm text-gray-400">Submit and track your leave requests.</p>
       </motion.div>
 
+      {/* Stats */}
       <motion.div
         className="grid grid-cols-1 sm:grid-cols-3 gap-4"
         variants={staggerContainer}
@@ -42,26 +66,99 @@ export default function LeaveClient({ initialData, stats }: Props) {
           badge="In review" badgeVariant="warning" delay={0.15} />
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...easeOut, delay: 0.2 }}>
-        <LeaveRequestForm />
+      {/* Leave Balance Cards */}
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...easeOut, delay: 0.18 }}
+      >
+        {/* Monthly */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">This Month</p>
+            <Badge
+              variant={balance.monthlyRemaining === 0 ? "danger" : balance.monthlyRemaining === 1 ? "warning" : "success"}
+              dot
+            >
+              {balance.monthlyRemaining} of {balance.monthlyLimit} days remaining
+            </Badge>
+          </div>
+          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+            <motion.div
+              className={`h-full rounded-full ${monthlyPct >= 100 ? "bg-red-400" : monthlyPct >= 50 ? "bg-amber-400" : "bg-emerald-400"}`}
+              initial={{ width: "0%" }}
+              animate={{ width: `${Math.min(monthlyPct, 100)}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-gray-400">{balance.monthlyUsed} used · {balance.monthlyLimit} total</p>
+        </div>
+
+        {/* Yearly */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">This Year</p>
+            <Badge
+              variant={balance.yearlyRemaining === 0 ? "danger" : balance.yearlyRemaining <= 3 ? "warning" : "success"}
+              dot
+            >
+              {balance.yearlyRemaining} of {balance.yearlyLimit} days remaining
+            </Badge>
+          </div>
+          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+            <motion.div
+              className={`h-full rounded-full ${yearlyPct >= 100 ? "bg-red-400" : yearlyPct >= 70 ? "bg-amber-400" : "bg-emerald-400"}`}
+              initial={{ width: "0%" }}
+              animate={{ width: `${Math.min(yearlyPct, 100)}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-gray-400">{balance.yearlyUsed} used · {balance.yearlyLimit} total</p>
+        </div>
       </motion.div>
 
+      {/* Monthly Breakdown */}
+      <Card title="Monthly Breakdown" subtitle="Leave usage per month" delay={0.22}>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {balance.monthlyBreakdown.map((m) => (
+            <div key={m.month} className="text-center">
+              <p className="text-[10px] text-gray-400 mb-1">{m.month}</p>
+              <div className="h-12 w-full bg-gray-50 rounded-lg flex flex-col items-center justify-end overflow-hidden relative">
+                <motion.div
+                  className={`w-full rounded-lg ${m.used >= 2 ? "bg-red-300" : m.used === 1 ? "bg-amber-300" : "bg-emerald-200"}`}
+                  initial={{ height: "0%" }}
+                  animate={{ height: m.used > 0 ? `${(m.used / 2) * 100}%` : "4px" }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                />
+              </div>
+              <p className="text-[10px] font-medium text-gray-500 mt-1">{m.used}/{2}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Leave Request Form */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...easeOut, delay: 0.25 }}>
+        <LeaveRequestForm balance={balance} />
+      </motion.div>
+
+      {/* History Table */}
       <Card title="Leave History" subtitle="All your previous requests" noPadding delay={0.3}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-50">
-                {["Reason", "From", "To", "Days", "Status"].map((h) => (
+                {["Reason", "From", "To", "Days", "Status", "Action"].map((h) => (
                   <th key={h} className="text-left px-6 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {initialData.map((row, i) => {
+              {data.map((row, i) => {
                 const diff = new Date(row.toDate).getTime() - new Date(row.fromDate).getTime();
                 const days = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
                 const statusVariant = row.status === "APPROVED" ? "success" : row.status === "REJECTED" ? "danger" : "warning";
-                
                 return (
                   <motion.tr
                     key={row.id}
@@ -76,12 +173,22 @@ export default function LeaveClient({ initialData, stats }: Props) {
                     <td className="px-6 py-4 text-gray-400">{new Date(row.toDate).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-gray-400">{days}d</td>
                     <td className="px-6 py-4"><Badge variant={statusVariant} dot>{row.status.charAt(0) + row.status.slice(1).toLowerCase()}</Badge></td>
+                    <td className="px-6 py-4">
+                      {/* Fix #14 — cancel button for PENDING only */}
+                      {row.status === "PENDING" ? (
+                        <Button size="xs" variant="danger" onClick={() => handleCancel(row.id)}>
+                          Cancel
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
                   </motion.tr>
                 );
               })}
-              {initialData.length === 0 && (
+              {data.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No leave requests found.</td>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">No leave requests found.</td>
                 </tr>
               )}
             </tbody>

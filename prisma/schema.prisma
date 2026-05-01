@@ -7,10 +7,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  CLASS_TEACHER
+  HOD
+}
+
+enum AdmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OTPStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+}
+
+enum FeeType {
+  Tuition
+  Transport
+  Activity
+}
+
+enum FeeStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
+enum AnnouncementCategory {
+  Events
+  Exams
+  Holidays
+  General
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  ADMISSION_APPROVED
+  ADMISSION_REJECTED
+  GENERAL
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
 model Student {
   id             Int            @id @default(autoincrement())
   name           String
   email          String         @unique
+  password       String?        // Hashed password (null until first login)
   phone          String
   parentName     String
   classEnrolled  String
@@ -20,8 +76,23 @@ model Student {
   createdAt      DateTime       @default(now())
   fees           Fee[]
   leaveRequests  LeaveRequest[]
+  notifications  Notification[]
 
   @@map("students")
+}
+
+model Staff {
+  id            Int            @id @default(autoincrement())
+  name          String
+  email         String         @unique
+  password      String         // Hashed password
+  role          Role           @default(CLASS_TEACHER)
+  assignedClass String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  leaveRequests LeaveRequest[]
+
+  @@map("staff")
 }
 
 model Admission {
@@ -29,18 +100,15 @@ model Admission {
   referenceNumber String          @unique
   studentName     String
   parentName      String
+  email           String          // Parent/Guardian email for notifications
   phone           String
   classApplied    String
   status          AdmissionStatus @default(PENDING)
   submittedAt     DateTime        @default(now())
+  approvedAt      DateTime?       // When HOD approved
+  approvedBy      String?         // HOD email who approved
 
   @@map("admissions")
-}
-
-enum AdmissionStatus {
-  PENDING
-  APPROVED
-  REJECTED
 }
 
 model Fee {
@@ -57,18 +125,6 @@ model Fee {
   @@map("fees")
 }
 
-enum FeeType {
-  Tuition
-  Transport
-  Activity
-}
-
-enum FeeStatus {
-  PAID
-  PENDING
-  OVERDUE
-}
-
 model Announcement {
   id          Int                  @id @default(autoincrement())
   title       String
@@ -82,29 +138,53 @@ model Announcement {
   @@map("announcements")
 }
 
-enum AnnouncementCategory {
-  Events
-  Exams
-  Holidays
-  General
-}
-
 model LeaveRequest {
-  id          Int                 @id @default(autoincrement())
-  studentId   Int
-  student     Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id          Int                @id @default(autoincrement())
+  // Either studentId OR staffId is set — not both
+  studentId   Int?
+  student     Student?           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  staffId     Int?
+  staff       Staff?             @relation(fields: [staffId], references: [id], onDelete: Cascade)
   leaveType   String
   fromDate    DateTime
   toDate      DateTime
-  reason      String              @db.Text
+  reason      String             @db.Text
   status      LeaveRequestStatus @default(PENDING)
-  submittedAt DateTime            @default(now())
+  submittedAt DateTime           @default(now())
 
   @@map("leave_requests")
 }
 
-enum LeaveRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
+model Notification {
+  id        Int              @id @default(autoincrement())
+  studentId Int
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model OTP {
+  id        Int       @id @default(autoincrement())
+  email     String
+  code      String    @unique
+  status    OTPStatus @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@map("otps")
+}
+
+model EmailVerification {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@map("email_verifications")
 }

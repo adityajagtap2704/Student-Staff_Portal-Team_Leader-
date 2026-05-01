@@ -4,32 +4,37 @@ import { redirect } from "next/navigation";
 import PageLayout from "@/components/layout/PageLayout";
 import LeaveClient from "./LeaveClient";
 import db from "@/lib/db";
+import { getLeaveBalance } from "@/lib/leaveBalance";
 
 export default async function LeavePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const user = session.user as { id: string };
+  const user      = session.user as any;
   const studentId = parseInt(user.id);
 
   const leaveRequests = await db.leaveRequest.findMany({
-    where: { studentId },
+    where:   { studentId },
     orderBy: { submittedAt: "desc" },
   });
 
+  const balance = await getLeaveBalance(studentId);
+
   const stats = {
-    total: leaveRequests.length,
-    approved: leaveRequests.filter(r => r.status === "APPROVED").length,
-    pending: leaveRequests.filter(r => r.status === "PENDING").length,
-    daysTaken: leaveRequests.filter(r => r.status === "APPROVED").reduce((acc, r) => {
-      const diff = new Date(r.toDate).getTime() - new Date(r.fromDate).getTime();
-      return acc + Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
-    }, 0)
+    total:     leaveRequests.length,
+    approved:  leaveRequests.filter((r) => r.status === "APPROVED").length,
+    pending:   leaveRequests.filter((r) => r.status === "PENDING").length,
+    daysTaken: leaveRequests
+      .filter((r) => r.status === "APPROVED")
+      .reduce((acc, r) => {
+        const diff = new Date(r.toDate).getTime() - new Date(r.fromDate).getTime();
+        return acc + Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+      }, 0),
   };
 
   return (
     <PageLayout session={session} title="Leave">
-      <LeaveClient initialData={leaveRequests} stats={stats} />
+      <LeaveClient initialData={leaveRequests} stats={stats} balance={balance} />
     </PageLayout>
   );
 }

@@ -6,11 +6,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, CreditCard, CalendarOff,
   Megaphone, UserCircle, X, GraduationCap,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, Users, BookOpen,
+  Bell,
 } from "lucide-react";
 import { useState } from "react";
+import { Session } from "next-auth";
 
-const navLinks = [
+// ── Nav links per role ────────────────────────────────────────────────────────
+const studentLinks = [
   { href: "/dashboard",               label: "Dashboard",     icon: LayoutDashboard, exact: true  },
   { href: "/dashboard/fees",          label: "Fees",          icon: CreditCard,      exact: false },
   { href: "/dashboard/leave",         label: "Leave",         icon: CalendarOff,     exact: false },
@@ -18,14 +21,36 @@ const navLinks = [
   { href: "/dashboard/profile",       label: "My Profile",    icon: UserCircle,      exact: false },
 ];
 
+const teacherLinks = [
+  { href: "/dashboard/staff",         label: "My Dashboard",  icon: LayoutDashboard, exact: true  },
+  { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone,       exact: false },
+];
+
+const hodLinks = [
+  { href: "/dashboard/hod",           label: "HOD Dashboard", icon: LayoutDashboard, exact: true  },
+  { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone,       exact: false },
+];
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  session: Session | null;
 }
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
-  const pathname = usePathname();
+export default function Sidebar({ open, onClose, session }: SidebarProps) {
+  const pathname  = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+
+  const role = (session?.user as any)?.role ?? "STUDENT";
+  const navLinks =
+    role === "HOD"           ? hodLinks     :
+    role === "CLASS_TEACHER" ? teacherLinks :
+    studentLinks;
+
+  const portalLabel =
+    role === "HOD"           ? "HOD Portal"     :
+    role === "CLASS_TEACHER" ? "Staff Portal"   :
+    "Student Portal";
 
   return (
     <>
@@ -77,7 +102,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   className="overflow-hidden"
                 >
                   <span className="text-sm font-bold text-[#444] tracking-tight whitespace-nowrap">KALNET</span>
-                  <p className="text-[10px] text-gray-400 leading-none whitespace-nowrap">Student Portal</p>
+                  <p className="text-[10px] text-gray-400 leading-none whitespace-nowrap">{portalLabel}</p>
                 </motion.div>
               )}
             </AnimatePresence>

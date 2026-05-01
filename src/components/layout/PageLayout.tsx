@@ -20,7 +20,7 @@ export default function PageLayout({ session, children, title }: PageLayoutProps
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8fafb]">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} session={session} />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Topbar

@@ -122,7 +122,7 @@ export default function AnnouncementsClient({ announcements }: Props) {
                           transition={{ type: "spring", stiffness: 400, damping: 25 }}
                         >
                           {/* Image / placeholder */}
-                          <div className="relative w-full h-36 overflow-hidden">
+                          <div className="relative w-full h-44 overflow-hidden">
                             {a.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
@@ -132,12 +132,14 @@ export default function AnnouncementsClient({ announcements }: Props) {
                               />
                             ) : (
                               <div className="w-full h-full bg-primary-50 flex items-center justify-center">
-                                <span className="text-4xl opacity-30">{cfg.emoji}</span>
+                                <span className="text-5xl opacity-20">{cfg.emoji}</span>
                               </div>
                             )}
+                            {/* Gradient overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                           </div>
                           <div className="p-5">
-                            <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex items-start justify-between gap-2 mb-2">
                               <Badge variant={cfg.variant}>{cfg.emoji} {a.category}</Badge>
                               <span className="text-[10px] text-gray-300 shrink-0">{formatDate(a.date)}</span>
                             </div>
@@ -145,13 +147,16 @@ export default function AnnouncementsClient({ announcements }: Props) {
                               {a.title}
                             </h3>
                             <p className="mt-1.5 text-xs text-gray-400 line-clamp-2">{a.description}</p>
-                            <motion.div
-                              className="mt-3 flex items-center gap-1 text-xs text-primary font-medium"
-                              initial={{ opacity: 0, x: -4 }}
-                              whileHover={{ opacity: 1, x: 0 }}
-                            >
-                              Read more <ArrowRight size={12} />
-                            </motion.div>
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="text-[10px] text-gray-300">{a.author}</span>
+                              <motion.div
+                                className="flex items-center gap-1 text-xs text-primary font-medium"
+                                initial={{ opacity: 0.6, x: -2 }}
+                                whileHover={{ opacity: 1, x: 0 }}
+                              >
+                                Read more <ArrowRight size={12} />
+                              </motion.div>
+                            </div>
                           </div>
                         </motion.div>
                       </Link>
