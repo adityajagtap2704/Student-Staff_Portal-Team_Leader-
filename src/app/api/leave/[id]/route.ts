@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createNotificationNoDuplicates } from "@/lib/notificationHelper";
+import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from "@/lib/emailNotifications";
 
 // Fix #10 — accept optional rejectionReason from teacher
 export async function PATCH(
@@ -65,6 +66,38 @@ export async function PATCH(
           : `Your leave request from ${fromStr} to ${toStr} (${leave.leaveType}) has been rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
         60 // 1 hour time window
       );
+
+      // Send email notification
+      try {
+        const student = await db.student.findUnique({ where: { id: leave.studentId } });
+        if (student && student.email) {
+          if (isApproved) {
+            const emailSent = await sendLeaveApprovedEmail(
+              student.name,
+              student.email,
+              leave.fromDate,
+              leave.toDate,
+              leave.leaveType
+            );
+            console.log("[LEAVE EMAIL] Approval email sent to:", student.email, "Status:", emailSent);
+          } else {
+            const emailSent = await sendLeaveRejectedEmail(
+              student.name,
+              student.email,
+              leave.fromDate,
+              leave.toDate,
+              leave.leaveType,
+              rejectionReason
+            );
+            console.log("[LEAVE EMAIL] Rejection email sent to:", student.email, "Status:", emailSent);
+          }
+        } else {
+          console.warn("[LEAVE EMAIL] Student not found or no email:", { studentId: leave.studentId, hasEmail: !!student?.email });
+        }
+      } catch (emailError) {
+        console.error("[LEAVE EMAIL] Error sending email:", emailError);
+        // Don't fail the request if email fails
+      }
     }
 
     return NextResponse.json(updated);
