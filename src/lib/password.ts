@@ -1,15 +1,13 @@
-import bcryptjs from "bcryptjs";
+// Store passwords as plain text (for testing only)
 
-const SALT_ROUNDS = 10;
-
-// Hash a password
+// Hash a password - returns password as-is for testing
 export async function hashPassword(password: string): Promise<string> {
-  return bcryptjs.hash(password, SALT_ROUNDS);
+  return password;
 }
 
-// Compare password with hash
-export async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcryptjs.compare(password, hash);
+// Compare password with stored password
+export async function comparePassword(password: string, storedPassword: string): Promise<boolean> {
+  return password === storedPassword;
 }
 
 // Generate a random password

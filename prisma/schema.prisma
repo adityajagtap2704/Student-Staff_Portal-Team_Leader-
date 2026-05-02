@@ -60,23 +60,40 @@ enum NotificationType {
   GENERAL
 }
 
+enum StudentStatus {
+  PRE_APPLICANT
+  APPLICANT
+  STUDENT
+  REJECTED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model Student {
-  id             Int            @id @default(autoincrement())
-  name           String
-  email          String         @unique
-  password       String?        // Hashed password (null until first login)
-  phone          String
-  parentName     String
-  classEnrolled  String
-  rollNumber     String         @unique
-  admissionDate  DateTime
-  isActive       Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  fees           Fee[]
-  leaveRequests  LeaveRequest[]
-  notifications  Notification[]
+  id                    Int            @id @default(autoincrement())
+  name                  String?        // Full name (set during enquiry)
+  email                 String         @unique // Login email (set during sign-up)
+  password              String         // Hashed password (set during sign-up)
+  phone                 String?        // Phone (set during enquiry)
+  parentName            String?        // Parent name (set during enquiry)
+  parentEmail           String?        // Parent/Guardian email for notifications
+  classEnrolled         String?        // Class (set during enquiry)
+  rollNumber            String?        @unique // Official roll number (set on approval)
+  officialEmail         String?        @unique // Official email (set on approval)
+  admissionDate         DateTime?      // When admitted (set on approval)
+  isActive              Boolean        @default(true)
+  status                StudentStatus  @default(PRE_APPLICANT) // PRE_APPLICANT → APPLICANT → STUDENT/REJECTED
+  enquiryNumber         String?        @unique // Unique enquiry reference (ENQ-2026-001)
+  admissionId           Int?           // Link to Admission record
+  admission             Admission?     @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+  documentsUploaded     String?        @db.LongText // JSON array of uploaded documents
+  applicationFeePaid    Boolean        @default(false)
+  applicationFeeAmount  Decimal?       @db.Decimal(10, 2)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  fees                  Fee[]
+  leaveRequests         LeaveRequest[]
+  notifications         Notification[]
 
   @@map("students")
 }
@@ -107,6 +124,8 @@ model Admission {
   submittedAt     DateTime        @default(now())
   approvedAt      DateTime?       // When HOD approved
   approvedBy      String?         // HOD email who approved
+  rejectionReason String?         // Reason for rejection
+  students        Student[]       // Reverse relation to Student
 
   @@map("admissions")
 }

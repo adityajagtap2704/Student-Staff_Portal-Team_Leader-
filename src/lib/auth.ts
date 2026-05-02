@@ -32,14 +32,14 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        // 2. Try Student
+        // 2. Try Student - Login with Email + Password (set during account setup)
         const student = await db.student.findUnique({
           where: { email: credentials.email },
         });
 
         if (student && student.isActive && student.password) {
           const passwordMatch = await comparePassword(credentials.password, student.password);
-          console.log(`[AUTH] Student login attempt: ${credentials.email}, Password match: ${passwordMatch}, Has password: ${!!student.password}`);
+          console.log(`[AUTH] Student login attempt: ${credentials.email}, Password match: ${passwordMatch}`);
           if (passwordMatch) {
             return {
               id:    student.id.toString(),

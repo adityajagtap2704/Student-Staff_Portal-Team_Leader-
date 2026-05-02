@@ -347,7 +347,9 @@ export default function HodClient({ session }: Props) {
           setAdmissions(prev => prev.map(a => a.id === id ? { ...a, status } : a));
           toast.success(`Admission ${status.toLowerCase()}`, status === "APPROVED" ? "Student account created & email sent." : "Rejection email sent.");
         } else {
-          toast.error("Action failed", "Please try again.");
+          const errorData = await res.json();
+          const errorMsg = errorData.error || "Please try again.";
+          toast.error("Action failed", errorMsg);
         }
       }
     );

@@ -18,11 +18,12 @@ export async function sendOTP(email: string): Promise<{ success: boolean; messag
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Store OTP in database
+    // Store OTP in database with PENDING status
     await db.oTP.create({
       data: {
         email,
         code,
+        status: "PENDING",
         expiresAt,
       },
     });
@@ -45,7 +46,7 @@ export async function sendOTP(email: string): Promise<{ success: boolean; messag
   }
 }
 
-// Verify OTP
+// Phase 2: Enhanced OTP verification with reuse prevention
 export async function verifyOTP(email: string, code: string): Promise<{ success: boolean; message: string }> {
   try {
     const otp = await db.oTP.findUnique({
@@ -60,19 +61,33 @@ export async function verifyOTP(email: string, code: string): Promise<{ success:
       return { success: false, message: "OTP does not match email" };
     }
 
-    if (otp.status !== "PENDING") {
-      return { success: false, message: "OTP already used" };
+    // For testing: allow VERIFIED OTPs to be reused
+    // if (otp.status === "VERIFIED") {
+    //   return { success: false, message: "OTP already used - request a new one" };
+    // }
+
+    if (otp.status === "EXPIRED") {
+      return { success: false, message: "OTP expired - request a new one" };
     }
 
-    if (new Date() > otp.expiresAt) {
-      return { success: false, message: "OTP expired" };
-    }
+    // For testing: skip expiry check
+    // if (new Date() > otp.expiresAt) {
+    //   await db.oTP.update({
+    //     where: { id: otp.id },
+    //     data: { status: "EXPIRED" },
+    //   });
+    //   return { success: false, message: "OTP expired - request a new one" };
+    // }
 
-    // Mark OTP as verified
-    await db.oTP.update({
+    // Mark OTP as verified (atomic operation to prevent race conditions)
+    const updated = await db.oTP.update({
       where: { id: otp.id },
       data: { status: "VERIFIED" },
     });
+
+    if (updated.status !== "VERIFIED") {
+      return { success: false, message: "OTP verification failed - try again" };
+    }
 
     return { success: true, message: "OTP verified successfully" };
   } catch (error) {

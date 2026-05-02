@@ -102,7 +102,7 @@ export default async function AnnouncementDetailPage({ params }: { params: { id:
             </div>
 
             <div className="space-y-4 text-gray-600 leading-relaxed">
-              {announcement.description.split("\n").map((para, i) => (
+              {announcement.description.split("\n").map((para: string, i: number) => (
                 para.trim() ? (
                   <p key={i} className="text-base leading-relaxed">{para}</p>
                 ) : null

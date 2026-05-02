@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createNotificationNoDuplicates } from "@/lib/notificationHelper";
 
 // Fix #10 — accept optional rejectionReason from teacher
 export async function PATCH(
@@ -27,6 +28,13 @@ export async function PATCH(
     const leave = await db.leaveRequest.findUnique({ where: { id } });
     if (!leave) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // Validate leave is PENDING before approval/rejection
+    if (leave.status !== "PENDING") {
+      return NextResponse.json({ 
+        error: `Cannot ${status.toLowerCase()} a leave that is already ${leave.status.toLowerCase()}` 
+      }, { status: 400 });
+    }
+
     // CLASS_TEACHER can only manage their class's students
     if (user.role === "CLASS_TEACHER" && user.assignedClass) {
       if (!leave.studentId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -47,16 +55,16 @@ export async function PATCH(
       const fromStr    = new Date(leave.fromDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
       const toStr      = new Date(leave.toDate).toLocaleDateString("en-IN",   { day: "numeric", month: "short", year: "numeric" });
 
-      await db.notification.create({
-        data: {
-          studentId: leave.studentId,
-          type:      isApproved ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
-          title:     isApproved ? "Leave Request Approved" : "Leave Request Rejected",
-          message:   isApproved
-            ? `Your leave request from ${fromStr} to ${toStr} (${leave.leaveType}) has been approved.`
-            : `Your leave request from ${fromStr} to ${toStr} (${leave.leaveType}) has been rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
-        },
-      });
+      // Phase 2: Use notification helper with duplicate prevention
+      await createNotificationNoDuplicates(
+        leave.studentId,
+        isApproved ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
+        isApproved ? "Leave Request Approved" : "Leave Request Rejected",
+        isApproved
+          ? `Your leave request from ${fromStr} to ${toStr} (${leave.leaveType}) has been approved.`
+          : `Your leave request from ${fromStr} to ${toStr} (${leave.leaveType}) has been rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+        60 // 1 hour time window
+      );
     }
 
     return NextResponse.json(updated);

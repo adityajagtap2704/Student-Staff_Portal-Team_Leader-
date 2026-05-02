@@ -205,8 +205,8 @@ export default function LoginPage() {
             className="mt-6 text-center text-xs text-gray-400"
           >
             New student?{" "}
-            <Link href="/admissions/enquire" className="text-primary hover:text-primary-600 font-medium transition-colors">
-              Submit an admission enquiry
+            <Link href="/signup" className="text-primary hover:text-primary-600 font-medium transition-colors">
+              Create an account
             </Link>
           </motion.p>
         </motion.div>

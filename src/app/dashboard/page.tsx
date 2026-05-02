@@ -9,8 +9,43 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const user = session.user as { id: string };
+  const user = session.user as { id: string; role: string };
+
+  // Check user role first
+  if (user.role === "HOD") {
+    redirect("/dashboard/hod");
+  }
+
+  if (user.role === "CLASS_TEACHER") {
+    redirect("/dashboard/staff");
+  }
+
+  // Only students can access this dashboard
+  if (user.role !== "STUDENT") {
+    redirect("/login");
+  }
+
   const studentId = parseInt(user.id);
+
+  // Phase 3: Check student status and redirect accordingly
+  const student = await db.student.findUnique({
+    where: { id: studentId },
+  });
+
+  // If student not found, redirect to login
+  if (!student) {
+    redirect("/login");
+  }
+
+  // Stage 1 & 2: PRE_APPLICANT or APPLICANT - redirect to application status
+  if (student.status === "PRE_APPLICANT" || student.status === "APPLICANT") {
+    redirect("/dashboard/application-status");
+  }
+
+  // Stage 3: REJECTED - redirect to application status
+  if (student.status === "REJECTED") {
+    redirect("/dashboard/application-status");
+  }
 
   // 1. Fetch Fees for Stats
   const fees = await db.fee.findMany({

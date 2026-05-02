@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { updateOverdueFees } from "@/lib/feeStatus";
 
 export async function GET() {
   try {
@@ -12,6 +13,9 @@ export async function GET() {
 
     const user = session.user as { id: string };
     const studentId = parseInt(user.id);
+
+    // Phase 2: Automatically update overdue fees before returning
+    await updateOverdueFees();
 
     const fees = await db.fee.findMany({
       where: { studentId },

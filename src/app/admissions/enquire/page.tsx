@@ -201,7 +201,11 @@ export default function AdmissionEnquiryPage() {
                     label="Student Name *"
                     placeholder="Min. 3 characters"
                     value={form.studentName}
-                    onChange={(e) => setForm({ ...form, studentName: e.target.value })}
+                    onChange={(e) => {
+                      // Only allow letters, spaces, hyphens, apostrophes
+                      const value = e.target.value.replace(/[^a-zA-Z\s\-']/g, "");
+                      setForm({ ...form, studentName: value });
+                    }}
                     onBlur={() => touch("studentName")}
                     error={errors.studentName}
                     icon={<User size={15} />}
@@ -210,7 +214,11 @@ export default function AdmissionEnquiryPage() {
                     label="Parent / Guardian *"
                     placeholder="Min. 3 characters"
                     value={form.parentName}
-                    onChange={(e) => setForm({ ...form, parentName: e.target.value })}
+                    onChange={(e) => {
+                      // Only allow letters, spaces, hyphens, apostrophes
+                      const value = e.target.value.replace(/[^a-zA-Z\s\-']/g, "");
+                      setForm({ ...form, parentName: value });
+                    }}
                     onBlur={() => touch("parentName")}
                     error={errors.parentName}
                     icon={<User size={15} />}
