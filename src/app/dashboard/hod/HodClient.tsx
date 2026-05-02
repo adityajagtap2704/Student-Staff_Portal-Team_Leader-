@@ -196,6 +196,15 @@ export default function HodClient({ session }: Props) {
     onConfirm: () => void;
   }>({ open: false, title: "", message: "", onConfirm: () => {} });
 
+  // ── Reassign modal state ──────────────────────────────────────────────────
+  const [reassignModal, setReassignModal] = useState<{
+    open: boolean;
+    staff: any | null;
+    selectedClass: string;
+  }>({ open: false, staff: null, selectedClass: "" });
+
+  const CLASSES = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
+
   const showConfirm = (title: string, message: string, onConfirm: () => void) => {
     setConfirmDialog({ open: true, title, message, onConfirm });
   };
@@ -212,7 +221,7 @@ export default function HodClient({ session }: Props) {
   const [admFilter, setAdmFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("ALL");
 
   // ── Leave sub-tab ─────────────────────────────────────────────────────────
-  const [leaveSubTab, setLeaveSubTab] = useState<"student" | "staff">("student");
+  const [leaveSubTab, setLeaveSubTab] = useState<"student" | "staff" | "admin">("student");
 
   // ── Student leave filter + pagination ────────────────────────────────────
   const [leaveFilter, setLeaveFilter] = useState<"PENDING"|"ALL"|"APPROVED"|"REJECTED">("PENDING");
@@ -222,6 +231,10 @@ export default function HodClient({ session }: Props) {
   // ── Admissions pagination ─────────────────────────────────────────────────
   const [admPage, setAdmPage] = useState(1);
   const ADM_PAGE_SIZE = 10;
+
+  // ── Class Teachers Overview pagination ────────────────────────────────────
+  const [teachersPage, setTeachersPage] = useState(1);
+  const TEACHERS_PAGE_SIZE = 15;
 
   // ── Lazy load data per tab ───────────────────────────────────────────────
   useEffect(() => {
@@ -832,54 +845,286 @@ export default function HodClient({ session }: Props) {
           STAFF TAB
       ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === "staff" && (
-        <Card title="Class Teachers" subtitle="All staff and their assigned classes" noPadding delay={0.1}>
-          {loadingS ? (
-            <SkeletonTable rows={4} />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-50">
-                    {["Name", "Email", "Assigned Class", "Students", "Pending Leave", "Status"].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {staff.map((s) => (
-                    <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-[#444]">{s.name}</td>
-                      <td className="px-4 py-3 text-gray-400">{s.email}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2.5 py-1 rounded-lg bg-primary-50 text-primary text-xs font-semibold">
-                          {s.assignedClass ?? "Unassigned"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{s.studentCount} / 10</td>
-                      <td className="px-4 py-3">
-                        {s.pendingLeaveCount > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
-                            <Clock size={10} /> {s.pendingLeaveCount} pending
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-300">None</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={s.isActive ? "success" : "neutral"} dot>
-                          {s.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                  {staff.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No staff found.</td></tr>
-                  )}
-                </tbody>
-              </table>
+        <div className="space-y-4">
+          {/* Staff Management Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={easeOut}
+            className="space-y-4"
+          >
+            {/* Pending & Approved & All Teachers Tabs */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setLeaveSubTab("student")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  leaveSubTab === "student"
+                    ? "bg-primary text-white shadow-glow"
+                    : "bg-white border border-gray-200 text-gray-500 hover:border-primary hover:text-primary"
+                }`}
+              >
+                <Clock size={16} />
+                Pending Staff
+              </button>
+              <button
+                onClick={() => setLeaveSubTab("staff")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  leaveSubTab === "staff"
+                    ? "bg-primary text-white shadow-glow"
+                    : "bg-white border border-gray-200 text-gray-500 hover:border-primary hover:text-primary"
+                }`}
+              >
+                <CheckCircle2 size={16} />
+                Approved Staff
+              </button>
+              <button
+                onClick={() => setLeaveSubTab("admin")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  leaveSubTab === "admin"
+                    ? "bg-primary text-white shadow-glow"
+                    : "bg-white border border-gray-200 text-gray-500 hover:border-primary hover:text-primary"
+                }`}
+              >
+                <Users size={16} />
+                All Class Teachers
+              </button>
             </div>
+
+            {/* Pending Staff List */}
+            {leaveSubTab === "student" && (
+              <Card title="Pending Staff Registrations" subtitle="New staff waiting for approval" noPadding delay={0.1}>
+                {loadingS ? (
+                  <SkeletonTable rows={3} />
+                ) : staff.filter(s => !s.isActive).length === 0 ? (
+                  <div className="p-8 text-center text-gray-400">
+                    <Users size={48} className="mx-auto mb-4 opacity-50" />
+                    <p>No pending staff registrations</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-50">
+                          {["Name", "Email", "Role", "Requested Class", "Actions"].map(h => (
+                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {staff.filter(s => !s.isActive).map((s) => (
+                          <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-[#444]">{s.name}</td>
+                            <td className="px-4 py-3 text-gray-400">{s.email}</td>
+                            <td className="px-4 py-3">
+                              <span className="px-2.5 py-1 rounded-lg bg-primary-50 text-primary text-xs font-semibold">
+                                {s.role === "CLASS_TEACHER" ? "Class Teacher" : "HOD"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{s.assignedClass || "—"}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                <Button size="xs" variant="secondary" onClick={() => {
+                                  // Approve logic here
+                                  showConfirm(
+                                    "Approve Staff",
+                                    `Approve ${s.name} as ${s.role === "CLASS_TEACHER" ? "Class Teacher" : "HOD"}?`,
+                                    async () => {
+                                      closeConfirm();
+                                      const res = await fetch(`/api/hod/staff/${s.id}/approve`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ assignedClass: s.assignedClass || null }),
+                                      });
+                                      if (res.ok) {
+                                        setStaff(prev => prev.map(st => st.id === s.id ? { ...st, isActive: true } : st));
+                                        toast.success("Staff approved", `${s.name} account activated.`);
+                                      } else {
+                                        const data = await res.json();
+                                        toast.error("Failed", data.error || "Please try again.");
+                                      }
+                                    }
+                                  );
+                                }}>Approve</Button>
+                                <Button size="xs" variant="danger" onClick={() => {
+                                  // Reject logic here
+                                  showConfirm(
+                                    "Reject Staff",
+                                    `Reject ${s.name}'s registration? This cannot be undone.`,
+                                    async () => {
+                                      closeConfirm();
+                                      const res = await fetch(`/api/hod/staff/${s.id}/reject`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                      });
+                                      if (res.ok) {
+                                        setStaff(prev => prev.filter(st => st.id !== s.id));
+                                        toast.success("Staff rejected", "Registration removed.");
+                                      } else {
+                                        toast.error("Failed", "Please try again.");
+                                      }
+                                    }
+                                  );
+                                }}>Reject</Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Approved Staff List */}
+            {leaveSubTab === "staff" && (
+              <div className="space-y-4">
+                <Card title="Approved Staff" subtitle="Active class teachers and their assignments" noPadding delay={0.1}>
+                  {loadingS ? (
+                    <SkeletonTable rows={4} />
+                  ) : (() => {
+                    const approvedTeachers = staff.filter(s => s.isActive && s.role === "CLASS_TEACHER");
+                    const approvedPages = Math.max(1, Math.ceil(approvedTeachers.length / TEACHERS_PAGE_SIZE));
+                    const paginatedApproved = approvedTeachers.slice((teachersPage - 1) * TEACHERS_PAGE_SIZE, teachersPage * TEACHERS_PAGE_SIZE);
+
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-50">
+                                {["Name", "Email", "Assigned Class", "Students", "Pending Leave", "Actions"].map(h => (
+                                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {paginatedApproved.map((s) => (
+                                <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="px-4 py-3 font-medium text-[#444]">{s.name}</td>
+                                  <td className="px-4 py-3 text-gray-400">{s.email}</td>
+                                  <td className="px-4 py-3">
+                                    <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-semibold">
+                                      {s.assignedClass ?? "Unassigned"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-500">{s.studentCount || 0}</td>
+                                  <td className="px-4 py-3">
+                                    {s.pendingLeaveCount > 0 ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                                        <Clock size={10} /> {s.pendingLeaveCount}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-gray-300">None</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Button size="xs" variant="secondary" onClick={() => {
+                                      setReassignModal({
+                                        open: true,
+                                        staff: s,
+                                        selectedClass: s.assignedClass || "",
+                                      });
+                                    }}>Reassign</Button>
+                                  </td>
+                                </tr>
+                              ))}
+                              {paginatedApproved.length === 0 && (
+                                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No approved class teachers found.</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        {approvedPages > 1 && (
+                          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-50">
+                            <p className="text-xs text-gray-400">{approvedTeachers.length} total · Page {teachersPage} of {approvedPages}</p>
+                            <div className="flex gap-1.5">
+                              <button onClick={() => setTeachersPage(p => Math.max(1, p - 1))} disabled={teachersPage === 1}
+                                className="px-3 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 disabled:opacity-40 hover:bg-gray-200 transition-colors">Prev</button>
+                              <button onClick={() => setTeachersPage(p => Math.min(approvedPages, p + 1))} disabled={teachersPage === approvedPages}
+                                className="px-3 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 disabled:opacity-40 hover:bg-gray-200 transition-colors">Next</button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </Card>
+              </div>
+            )}
+          </motion.div>
+
+          {/* All Class Teachers List - Show when All Class Teachers tab is active */}
+          {leaveSubTab === "admin" && (
+            <Card title="All Class Teachers" subtitle="Complete list of all active class teachers" noPadding delay={0.2}>
+              {loadingS ? (
+                <SkeletonTable rows={4} />
+              ) : (() => {
+                const filteredTeachers = staff.filter(s => s.role === "CLASS_TEACHER" && s.isActive);
+                const totalPages = Math.max(1, Math.ceil(filteredTeachers.length / TEACHERS_PAGE_SIZE));
+                const paginatedTeachers = filteredTeachers.slice((teachersPage - 1) * TEACHERS_PAGE_SIZE, teachersPage * TEACHERS_PAGE_SIZE);
+
+                return (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-50">
+                            {["Name", "Email", "Assigned Class", "Students", "Pending Leave", "Status"].map(h => (
+                              <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {paginatedTeachers.map((s) => (
+                            <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-4 py-3 font-medium text-[#444]">{s.name}</td>
+                              <td className="px-4 py-3 text-gray-400">{s.email}</td>
+                              <td className="px-4 py-3">
+                                <span className="px-2.5 py-1 rounded-lg bg-primary-50 text-primary text-xs font-semibold">
+                                  {s.assignedClass ?? "Unassigned"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-500">{s.studentCount || 0}</td>
+                              <td className="px-4 py-3">
+                                {s.pendingLeaveCount > 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                                    <Clock size={10} /> {s.pendingLeaveCount} pending
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-300">None</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge variant={s.isActive ? "success" : "neutral"} dot>
+                                  {s.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                          {paginatedTeachers.length === 0 && (
+                            <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No class teachers found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-50">
+                        <p className="text-xs text-gray-400">{filteredTeachers.length} total · Page {teachersPage} of {totalPages}</p>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => setTeachersPage(p => Math.max(1, p - 1))} disabled={teachersPage === 1}
+                            className="px-3 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 disabled:opacity-40 hover:bg-gray-200 transition-colors">Prev</button>
+                          <button onClick={() => setTeachersPage(p => Math.min(totalPages, p + 1))} disabled={teachersPage === totalPages}
+                            className="px-3 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 disabled:opacity-40 hover:bg-gray-200 transition-colors">Next</button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </Card>
           )}
-        </Card>
+        </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1013,6 +1258,90 @@ export default function HodClient({ session }: Props) {
               </div>
             )}
           </Card>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REASSIGN CLASS MODAL
+      ══════════════════════════════════════════════════════════════════════ */}
+      {reassignModal.open && reassignModal.staff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 max-w-sm w-full mx-4"
+          >
+            <h3 className="text-base font-bold text-[#444]">Reassign Class</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Reassign <span className="font-semibold">{reassignModal.staff.name}</span> to a new class
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <label htmlFor="class-select" className="block text-sm font-medium text-[#444]">Select New Class *</label>
+                <select
+                  id="class-select"
+                  value={reassignModal.selectedClass}
+                  onChange={(e) => setReassignModal(m => ({ ...m, selectedClass: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#444] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                >
+                  <option value="">-- Select a class --</option>
+                  {CLASSES.map(cls => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+                <p className="text-xs text-blue-700">
+                  <span className="font-semibold">Note:</span> Students in the old class will remain in their current class. Only the teacher&apos;s assignment changes.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReassignModal({ open: false, staff: null, selectedClass: "" })}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!reassignModal.selectedClass}
+                onClick={async () => {
+                  if (!reassignModal.selectedClass) return;
+
+                  const res = await fetch(`/api/hod/staff/${reassignModal.staff.id}/reassign-class`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ newClass: reassignModal.selectedClass }),
+                  });
+
+                  if (res.ok) {
+                    setStaff(prev =>
+                      prev.map(s =>
+                        s.id === reassignModal.staff.id
+                          ? { ...s, assignedClass: reassignModal.selectedClass }
+                          : s
+                      )
+                    );
+                    toast.success("Class reassigned", `${reassignModal.staff.name} is now assigned to ${reassignModal.selectedClass}`);
+                    setReassignModal({ open: false, staff: null, selectedClass: "" });
+                  } else {
+                    const data = await res.json();
+                    toast.error("Failed to reassign", data.error || "Please try again.");
+                  }
+                }}
+              >
+                Confirm Reassignment
+              </Button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

@@ -8,28 +8,33 @@ import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
 import { easeOut } from "@/components/motion/MotionConfig";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
-export default function SignUpPage() {
+export default function StaffSignUpPage() {
   const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<"CLASS_TEACHER" | "HOD">("CLASS_TEACHER");
+  const [assignedClass, setAssignedClass] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [step, setStep] = useState<"signup" | "verify">("signup");
+  const [step, setStep] = useState<"info" | "verify">("info");
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const CLASSES = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     // Validation
-    if (!email || !password || !confirmPassword) {
-      setError("Please fill in all fields");
+    if (!name || !email || !password || !confirmPassword || !role) {
+      setError("Please fill in all required fields");
       return;
     }
 
@@ -58,13 +63,25 @@ export default function SignUpPage() {
       return;
     }
 
+    // Class Teacher must have assigned class
+    if (role === "CLASS_TEACHER" && !assignedClass) {
+      setError("Please select a class for Class Teachers");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          role,
+          assignedClass: role === "CLASS_TEACHER" ? assignedClass : null,
+        }),
       });
 
       const data = await res.json();
@@ -122,17 +139,18 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={easeOut}
         >
-          <Card title="Account Created Successfully!" noPadding>
+          <Card title="Email Verified Successfully!" noPadding>
             <div className="p-8 text-center">
               <div className="text-5xl mb-4">✅</div>
-              <p className="text-gray-600 mb-2">Your account has been created!</p>
-              <p className="text-gray-500 mb-6">Redirecting to login...</p>
+              <p className="text-gray-600 mb-2">Your staff account has been created!</p>
+              <p className="text-gray-500 mb-6">Your account is now active and pending HOD approval.</p>
+              <p className="text-sm text-gray-400 mb-6">Redirecting to login...</p>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
             </div>
           </Card>
@@ -142,18 +160,27 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={easeOut}
         className="w-full max-w-md"
       >
-        <Card title={step === "signup" ? "Create Your Account" : "Verify Your Email"} noPadding>
+        <Card title={step === "info" ? "Staff Registration" : "Verify Your Email"} noPadding>
           <div className="p-8">
+            {/* Back Button */}
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-1 text-sm text-primary hover:underline mb-4"
+            >
+              <ArrowLeft size={14} />
+              Back
+            </button>
+
             {/* Progress Indicator */}
             <div className="flex gap-2 mb-6">
-              <div className={`h-1 flex-1 rounded ${step === "signup" ? "bg-primary" : "bg-gray-300"}`}></div>
+              <div className={`h-1 flex-1 rounded ${step === "info" ? "bg-primary" : "bg-gray-300"}`}></div>
               <div className={`h-1 flex-1 rounded ${step === "verify" ? "bg-primary" : "bg-gray-300"}`}></div>
             </div>
 
@@ -164,15 +191,28 @@ export default function SignUpPage() {
               </div>
             )}
 
-            {step === "signup" ? (
+            {step === "info" ? (
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
+                    Full Name *
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Mrs. Lakshmi Devi"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address *
                   </label>
                   <Input
                     type="email"
-                    placeholder="your-email@gmail.com"
+                    placeholder="your-email@school.edu"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={loading}
@@ -184,7 +224,43 @@ export default function SignUpPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
+                    Role *
+                  </label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as "CLASS_TEACHER" | "HOD")}
+                    disabled={loading}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="CLASS_TEACHER">Class Teacher</option>
+                    <option value="HOD">Head of Department (HOD)</option>
+                  </select>
+                </div>
+
+                {role === "CLASS_TEACHER" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Assigned Class *
+                    </label>
+                    <select
+                      value={assignedClass}
+                      onChange={(e) => setAssignedClass(e.target.value)}
+                      disabled={loading}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Select a class</option>
+                      {CLASSES.map((cls) => (
+                        <option key={cls} value={cls}>
+                          {cls}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password *
                   </label>
                   <div className="relative">
                     <input
@@ -210,7 +286,7 @@ export default function SignUpPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password
+                    Confirm Password *
                   </label>
                   <div className="relative">
                     <input
@@ -237,7 +313,7 @@ export default function SignUpPage() {
                   disabled={loading}
                   className="w-full"
                 >
-                  {loading ? "Creating Account..." : "Create Account"}
+                  {loading ? "Creating Account..." : "Create Staff Account"}
                 </Button>
               </form>
             ) : (
@@ -276,7 +352,7 @@ export default function SignUpPage() {
 
                 <button
                   type="button"
-                  onClick={() => setStep("signup")}
+                  onClick={() => setStep("info")}
                   className="w-full text-sm text-primary hover:underline"
                 >
                   Back to Sign-Up

@@ -4,17 +4,22 @@ export const MONTHLY_LIMIT = 2;
 export const YEARLY_LIMIT  = MONTHLY_LIMIT * 12; // 24 days per year (2 days × 12 months)
 
 /** Count days inclusive between two dates */
-export function countDays(from: Date, to: Date): number {
-  // Ensure we're working with dates at midnight to avoid time zone issues
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
+export function countDays(from: Date | string, to: Date | string): number {
+  // Convert to Date objects
+  let fromDate = typeof from === 'string' ? new Date(from) : new Date(from);
+  let toDate = typeof to === 'string' ? new Date(to) : new Date(to);
   
-  fromDate.setHours(0, 0, 0, 0);
-  toDate.setHours(0, 0, 0, 0);
+  // Reset time to midnight UTC to avoid timezone issues
+  fromDate = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate()));
+  toDate = new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate()));
   
+  // Calculate difference in milliseconds
   const diff = toDate.getTime() - fromDate.getTime();
-  // Add 1 to make it inclusive (e.g., same day = 1 day)
-  return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+  
+  // Convert to days and add 1 to make it inclusive
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+  
+  return Math.max(1, days); // At least 1 day
 }
 
 export interface LeaveBalance {
@@ -29,8 +34,8 @@ export interface LeaveBalance {
 
 export async function getLeaveBalance(studentId: number): Promise<LeaveBalance> {
   const now   = new Date();
-  const year  = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
+  const year  = now.getUTCFullYear();
+  const month = now.getUTCMonth(); // 0-indexed
 
   // Fetch only APPROVED requests for balance display
   // PENDING requests are NOT counted — student should not be blocked while awaiting approval
@@ -51,15 +56,31 @@ export async function getLeaveBalance(studentId: number): Promise<LeaveBalance> 
     0
   );
 
-  // Monthly total (current month)
+  // Helper to get month boundaries in UTC
+  const getMonthBoundaries = (y: number, m: number) => {
+    const start = new Date(Date.UTC(y, m, 1));
+    const end = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59, 999));
+    return { start, end };
+  };
+
+  // Monthly total (current month) - only count days that fall in current month
+  const { start: monthStart, end: monthEnd } = getMonthBoundaries(year, month);
+  
   const monthlyRequests = requests.filter((r) => {
-    const d = new Date(r.fromDate);
-    return d.getFullYear() === year && d.getMonth() === month;
+    const fromDate = new Date(r.fromDate);
+    const toDate = new Date(r.toDate);
+    return fromDate <= monthEnd && toDate >= monthStart;
   });
-  const monthlyUsed = monthlyRequests.reduce(
-    (acc, r) => acc + countDays(r.fromDate, r.toDate),
-    0
-  );
+  
+  const monthlyUsed = monthlyRequests.reduce((acc, r) => {
+    const fromDate = new Date(r.fromDate);
+    const toDate = new Date(r.toDate);
+    
+    const effectiveFrom = fromDate > monthStart ? fromDate : monthStart;
+    const effectiveTo = toDate < monthEnd ? toDate : monthEnd;
+    
+    return acc + countDays(effectiveFrom, effectiveTo);
+  }, 0);
 
   // Monthly breakdown Jan–Dec
   const monthNames = [
@@ -67,14 +88,24 @@ export async function getLeaveBalance(studentId: number): Promise<LeaveBalance> 
     "Jul","Aug","Sep","Oct","Nov","Dec",
   ];
   const monthlyBreakdown = monthNames.map((name, idx) => {
+    const { start: mStart, end: mEnd } = getMonthBoundaries(year, idx);
+    
     const monthReqs = requests.filter((r) => {
-      const d = new Date(r.fromDate);
-      return d.getFullYear() === year && d.getMonth() === idx;
+      const fromDate = new Date(r.fromDate);
+      const toDate = new Date(r.toDate);
+      return fromDate <= mEnd && toDate >= mStart;
     });
-    const used = monthReqs.reduce(
-      (acc, r) => acc + countDays(r.fromDate, r.toDate),
-      0
-    );
+    
+    const used = monthReqs.reduce((acc, r) => {
+      const fromDate = new Date(r.fromDate);
+      const toDate = new Date(r.toDate);
+      
+      const effectiveFrom = fromDate > mStart ? fromDate : mStart;
+      const effectiveTo = toDate < mEnd ? toDate : mEnd;
+      
+      return acc + countDays(effectiveFrom, effectiveTo);
+    }, 0);
+    
     return { month: name, used, remaining: Math.max(0, MONTHLY_LIMIT - used) };
   });
 

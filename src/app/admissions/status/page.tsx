@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -10,12 +10,11 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { easeOut } from "@/components/motion/MotionConfig";
 
-export default function AdmissionStatusPage() {
+function AdmissionStatusContent() {
   const searchParams = useSearchParams();
   const refFromUrl = searchParams.get("ref");
 
   const [referenceNumber, setReferenceNumber] = useState(refFromUrl || "");
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [admission, setAdmission] = useState<any>(null);
@@ -296,5 +295,13 @@ export default function AdmissionStatusPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AdmissionStatusPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-blue-50">Loading...</div>}>
+      <AdmissionStatusContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Input, { Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -23,6 +23,23 @@ export default function LeaveRequestForm({ balance }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [requestId, setRequestId] = useState("");
+  const [isStaff, setIsStaff] = useState(false);
+
+  // Detect if user is staff by checking the current URL or session
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const response = await fetch("/api/profile");
+        if (response.ok) {
+          const data = await response.json();
+          setIsStaff(data.role === "CLASS_TEACHER" || data.role === "HOD");
+        }
+      } catch (error) {
+        console.error("Error checking user role:", error);
+      }
+    };
+    checkUserRole();
+  }, []);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -42,7 +59,10 @@ export default function LeaveRequestForm({ balance }: Props) {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/leave", {
+      // Use different endpoint based on user role
+      const endpoint = isStaff ? "/api/staff/leave/request" : "/api/leave";
+      
+      const response = await fetch(endpoint, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(form),

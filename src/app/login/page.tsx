@@ -18,33 +18,50 @@ export default function LoginPage() {
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   // Fix #16 — redirect already-authenticated users away from login
   useEffect(() => {
+    if (redirecting) return; // Don't redirect multiple times
+    
     if (status === "authenticated" && session?.user) {
       const role = (session.user as any).role;
-      if (role === "HOD")           router.replace("/dashboard/hod");
-      else if (role === "CLASS_TEACHER") router.replace("/dashboard/staff");
-      else                          router.replace("/dashboard");
+      if (role === "HOD") {
+        setRedirecting(true);
+        router.replace("/dashboard/hod");
+      } else if (role === "CLASS_TEACHER") {
+        setRedirecting(true);
+        router.replace("/dashboard/staff");
+      } else {
+        setRedirecting(true);
+        router.replace("/dashboard");
+      }
     }
-  }, [status, session, router]);
+  }, [status, session, router, redirecting]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const result = await signIn("credentials", { email, password, redirect: false });
-    setLoading(false);
-    if (result?.error) {
-      setError("Invalid email or password. Please try again.");
-    } else {
-      // Fix #1 — redirect by role after login
-      const res  = await fetch("/api/auth/session");
-      const data = await res.json();
-      const role = data?.user?.role;
-      if (role === "HOD")                router.push("/dashboard/hod");
-      else if (role === "CLASS_TEACHER") router.push("/dashboard/staff");
-      else                               router.push("/dashboard");
+    
+    try {
+      const result = await signIn("credentials", { 
+        email, 
+        password, 
+        redirect: false 
+      });
+      
+      if (result?.error) {
+        setError("Invalid email or password. Please try again.");
+        setLoading(false);
+      } else if (result?.ok) {
+        // Sign-in successful, the useEffect will handle redirection based on role
+        // Don't set loading to false - keep it true to show loading state
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An error occurred during login. Please try again.");
+      setLoading(false);
     }
   };
 
@@ -199,16 +216,37 @@ export default function LoginPage() {
 
 
 
-          <motion.p
+          <motion.div
             variants={staggerItem}
             transition={{ ...easeOut, delay: 0.3 }}
-            className="mt-6 text-center text-xs text-gray-400"
+            className="mt-8 pt-6 border-t border-gray-200 space-y-3"
           >
-            New student?{" "}
-            <Link href="/signup" className="text-primary hover:text-primary-600 font-medium transition-colors">
-              Create an account
-            </Link>
-          </motion.p>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">New here?</p>
+            
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">
+                <span className="font-medium text-gray-700">👨‍🎓 Students:</span> Apply through admission enquiry
+              </p>
+              <Link
+                href="/admissions/enquire"
+                className="block w-full px-4 py-2 rounded-lg bg-primary-50 border border-primary-200 text-primary font-medium hover:bg-primary-100 transition-colors text-center text-sm"
+              >
+                Start Admission Enquiry
+              </Link>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">
+                <span className="font-medium text-gray-700">👨‍🏫 Staff:</span> Create your staff account
+              </p>
+              <Link
+                href="/signup"
+                className="block w-full px-4 py-2 rounded-lg bg-primary-50 border border-primary-200 text-primary font-medium hover:bg-primary-100 transition-colors text-center text-sm"
+              >
+                Create Staff Account
+              </Link>
+            </div>
+          </motion.div>
         </motion.div>
 
         <motion.p

@@ -1,38 +1,61 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import db from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const user    = session?.user as any;
-    if (!session || user?.role !== "HOD") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    // Verify user is HOD
+    if (!session?.user || (session.user as any).role !== "HOD") {
+      return NextResponse.json(
+        { error: "Unauthorized. Only HOD can access this." },
+        { status: 403 }
+      );
     }
 
+    // Get all staff with approval status
     const staff = await db.staff.findMany({
-      where:   { role: "CLASS_TEACHER" },
-      orderBy: { assignedClass: "asc" },
-      select:  { id: true, name: true, email: true, assignedClass: true, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        assignedClass: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
     });
 
-    // Attach student count and pending leave count per staff
-    const result = await Promise.all(
+    // Add approval status based on isActive
+    // PENDING = not active, APPROVED = active
+    const staffWithStatus = await Promise.all(
       staff.map(async (s) => {
-        const studentCount = s.assignedClass
-          ? await db.student.count({ where: { classEnrolled: s.assignedClass } })
-          : 0;
-        const pendingLeaveCount = await db.leaveRequest.count({
-          where: { staffId: s.id, status: "PENDING" },
-        });
-        return { ...s, studentCount, pendingLeaveCount };
+        let studentCount = 0;
+        if (s.assignedClass) {
+          studentCount = await db.student.count({
+            where: { classEnrolled: s.assignedClass },
+          });
+        }
+
+        return {
+          ...s,
+          approvalStatus: s.isActive ? "APPROVED" : "PENDING",
+          studentCount,
+          pendingLeaveCount: 0, // Placeholder for now
+        };
       })
     );
 
-    return NextResponse.json(result);
+    // Return as array directly (not wrapped in object)
+    return NextResponse.json(staffWithStatus);
   } catch (error) {
-    console.error("HOD Staff Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("Error fetching staff:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

@@ -306,17 +306,26 @@ export default function HomePage() {
                   href="/login"
                   className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-primary text-white font-semibold text-base shadow-glow hover:shadow-glow-lg transition-all duration-200 w-full sm:w-auto justify-center"
                 >
-                  Student Login
+                  Sign In
                   <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />
                 </Link>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.97 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
+              <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
                 <Link
                   href="/admissions/enquire"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white border border-gray-200 text-[#444] font-semibold text-base shadow-card hover:shadow-soft hover:border-gray-300 transition-all duration-200 w-full sm:w-auto justify-center"
+                  className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-primary text-white font-semibold text-base shadow-glow hover:shadow-glow-lg transition-all duration-200 w-full sm:w-auto justify-center"
                 >
-                  Admission Enquiry
-                  <ChevronRight size={17} className="text-gray-400" />
+                  👨‍🎓 Student Admission
+                  <ChevronRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
+                <Link
+                  href="/signup"
+                  className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-primary text-white font-semibold text-base shadow-glow hover:shadow-glow-lg transition-all duration-200 w-full sm:w-auto justify-center"
+                >
+                  👨‍🏫 Staff Registration
+                  <ChevronRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />
                 </Link>
               </motion.div>
             </motion.div>
@@ -417,15 +426,23 @@ export default function HomePage() {
                     href="/login"
                     className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white text-primary font-semibold text-base hover:bg-primary-50 transition-colors shadow-soft w-full sm:w-auto justify-center"
                   >
-                    Student Login <ArrowRight size={17} />
+                    Sign In <ArrowRight size={17} />
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
                   <Link
                     href="/admissions/enquire"
-                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white font-semibold text-base hover:bg-white/20 transition-colors w-full sm:w-auto justify-center"
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white text-primary font-semibold text-base hover:bg-primary-50 transition-colors shadow-soft w-full sm:w-auto justify-center"
                   >
-                    Admission Enquiry
+                    👨‍🎓 Student Admission
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white text-primary font-semibold text-base hover:bg-primary-50 transition-colors shadow-soft w-full sm:w-auto justify-center"
+                  >
+                    👨‍🏫 Staff Registration
                   </Link>
                 </motion.div>
               </motion.div>

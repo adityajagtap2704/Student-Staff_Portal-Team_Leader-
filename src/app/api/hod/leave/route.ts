@@ -12,16 +12,25 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Only fetch student leave requests (staffId is null)
+    // Fetch all student leave requests (where studentId is not null)
     const leaveRequests = await db.leaveRequest.findMany({
-      where:   { studentId: { not: null } },
-      include: { student: { select: { name: true, rollNumber: true, classEnrolled: true } } },
+      where: {
+        studentId: { not: null },
+      },
+      include: { 
+        student: { 
+          select: { 
+            name: true, 
+            rollNumber: true, 
+            classEnrolled: true 
+          } 
+        } 
+      },
       orderBy: { submittedAt: "desc" },
     });
 
     const result = await Promise.all(
       leaveRequests.map(async (lr) => {
-        // studentId is guaranteed non-null here due to the where filter
         const balance = lr.studentId ? await getLeaveBalance(lr.studentId) : null;
         return { ...lr, leaveBalance: balance };
       })

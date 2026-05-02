@@ -207,3 +207,16 @@ model EmailVerification {
 
   @@map("email_verifications")
 }
+
+model StaffSignupTemp {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  name          String
+  password      String    // Hashed password
+  role          Role      @default(CLASS_TEACHER)
+  assignedClass String?
+  expiresAt     DateTime  // OTP expires, so this signup data expires too
+  createdAt     DateTime  @default(now())
+
+  @@map("staff_signup_temp")
+}

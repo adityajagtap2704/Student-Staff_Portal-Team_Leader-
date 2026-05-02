@@ -1,165 +1,131 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ArrowLeft, Calendar, User, ChevronRight, Share2 } from "lucide-react";
-import db from "@/lib/db";
+import { ArrowLeft, Calendar, User } from "lucide-react";
+import Button from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 
-type Category = "Events" | "Exams" | "Holidays" | "General";
+export default function AnnouncementDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
 
-const categoryMeta: Record<Category, { bg: string; text: string; placeholder: string; emoji: string }> = {
-  Events:   { bg: "bg-amber-100",  text: "text-amber-700",   placeholder: "bg-amber-50",   emoji: "🎉" },
-  Exams:    { bg: "bg-red-100",    text: "text-red-700",     placeholder: "bg-red-50",     emoji: "📝" },
-  Holidays: { bg: "bg-emerald-100",text: "text-emerald-700", placeholder: "bg-emerald-50", emoji: "🌴" },
-  General:  { bg: "bg-blue-100",   text: "text-blue-700",    placeholder: "bg-blue-50",    emoji: "📢" },
-};
+  const [announcement, setAnnouncement] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function AnnouncementDetailPage({ params }: { params: { id: string } }) {
-  const annId = parseInt(params.id);
-  if (isNaN(annId)) notFound();
+  useEffect(() => {
+    if (!id) return;
 
-  const announcement = await db.announcement.findUnique({ where: { id: annId } });
-  if (!announcement) notFound();
+    fetch(`/api/announcements/${id}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Announcement not found");
+        return res.json();
+      })
+      .then(data => {
+        setAnnouncement(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [id]);
 
-  const related = await db.announcement.findMany({
-    where: { category: announcement.category as any, id: { not: announcement.id } },
-    take: 3,
-    orderBy: { date: "desc" },
-  });
-
-  const meta = categoryMeta[announcement.category as Category] ?? categoryMeta["General"];
-
-  const formatDate = (date: Date) =>
-    new Date(date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-
-  const formatDateShort = (date: Date) =>
-    new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-  return (
-    <div className="min-h-screen bg-gray-50/50 pb-20">
-
-      {/* ── Sticky nav ── */}
-      <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 pt-6 pb-4 px-4 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link
-            href="/announcements"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors font-medium group"
-          >
-            <ArrowLeft size={15} className="group-hover:-translate-x-0.5 transition-transform" />
-            Back to Announcements
-          </Link>
-          <button
-            className="h-9 w-9 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="Share"
-          >
-            <Share2 size={15} />
-          </button>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+        <div className="max-w-3xl mx-auto">
+          <Skeleton className="h-8 w-32 mb-6" />
+          <Skeleton className="h-64 w-full rounded-2xl mb-6" />
+          <Skeleton className="h-12 w-full mb-4" />
+          <Skeleton className="h-32 w-full" />
         </div>
       </div>
+    );
+  }
 
-      <main className="max-w-4xl mx-auto px-4 mt-8">
-        <article className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+  if (error || !announcement) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-[#444] mb-2">Announcement Not Found</h1>
+          <p className="text-gray-400 mb-6">{error || "The announcement you're looking for doesn't exist."}</p>
+          <Link href="/announcements">
+            <Button icon={<ArrowLeft size={14} />}>Back to Announcements</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-          {/* ── Hero image (full-bleed) ── */}
-          <div className="relative w-full h-56 sm:h-80 overflow-hidden">
-            {announcement.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-3xl mx-auto">
+        {/* Back button */}
+        <Link href="/announcements" className="inline-flex items-center gap-2 text-primary hover:text-primary-600 font-medium mb-6 transition-colors">
+          <ArrowLeft size={16} />
+          Back to Announcements
+        </Link>
+
+        {/* Main card */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          {/* Image */}
+          {announcement.imageUrl && (
+            <div className="h-96 w-full overflow-hidden bg-gray-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={announcement.imageUrl}
                 alt={announcement.title}
                 className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
-            ) : (
-              <div className={`w-full h-full ${meta.placeholder} flex items-center justify-center`}>
-                <span className="text-8xl opacity-20">{meta.emoji}</span>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="p-8">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary-50 text-primary">
+                  {announcement.category}
+                </span>
               </div>
-            )}
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
-            {/* Category badge on image */}
-            <span className={`absolute bottom-4 left-6 text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm ${meta.bg} ${meta.text}`}>
-              {meta.emoji} {announcement.category}
-            </span>
-          </div>
+              <h1 className="text-3xl font-bold text-[#444] mb-4">{announcement.title}</h1>
 
-          {/* ── Article body ── */}
-          <div className="p-6 sm:p-10">
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-5 leading-tight">
-              {announcement.title}
-            </h1>
-
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 font-medium mb-8 pb-8 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary-50 flex items-center justify-center">
-                  <Calendar size={14} className="text-primary-600" />
+              {/* Meta info */}
+              <div className="flex flex-wrap gap-6 text-sm text-gray-500">
+                <div className="flex items-center gap-2">
+                  <User size={16} className="text-primary" />
+                  <span>{announcement.author}</span>
                 </div>
-                {formatDate(announcement.date)}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center">
-                  <User size={14} className="text-gray-500" />
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-primary" />
+                  <span>{new Date(announcement.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</span>
                 </div>
-                {announcement.author}
               </div>
             </div>
 
-            <div className="space-y-4 text-gray-600 leading-relaxed">
-              {announcement.description.split("\n").map((para: string, i: number) => (
-                para.trim() ? (
-                  <p key={i} className="text-base leading-relaxed">{para}</p>
-                ) : null
-              ))}
-            </div>
-          </div>
-        </article>
+            {/* Divider */}
+            <div className="h-px bg-gray-100 my-6" />
 
-        {/* ── Related announcements ── */}
-        {related.length > 0 && (
-          <div className="mt-12">
-            <h3 className="text-lg font-bold text-gray-900 mb-5">Related Announcements</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {related.map((item) => {
-                const relMeta = categoryMeta[item.category as Category] ?? categoryMeta["General"];
-                return (
-                  <Link
-                    href={`/announcements/${item.id}`}
-                    key={item.id}
-                    className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-100 transition-all duration-300 overflow-hidden flex flex-col"
-                  >
-                    {/* Thumbnail */}
-                    <div className="relative w-full h-32 overflow-hidden shrink-0">
-                      {item.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className={`w-full h-full ${relMeta.placeholder} flex items-center justify-center`}>
-                          <span className="text-4xl opacity-20">{relMeta.emoji}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${relMeta.bg} ${relMeta.text}`}>
-                          {item.category}
-                        </span>
-                        <span className="text-[10px] text-gray-400">{formatDateShort(item.date)}</span>
-                      </div>
-                      <h4 className="text-sm font-bold text-gray-900 group-hover:text-primary transition-colors line-clamp-2 flex-1">
-                        {item.title}
-                      </h4>
-                      <div className="flex items-center text-xs font-semibold text-primary mt-3">
-                        Read more <ChevronRight size={13} className="ml-0.5" />
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+            {/* Description */}
+            <div className="prose prose-sm max-w-none">
+              <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{announcement.description}</p>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <p className="text-xs text-gray-400">
+                Posted on {new Date(announcement.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </p>
             </div>
           </div>
-        )}
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

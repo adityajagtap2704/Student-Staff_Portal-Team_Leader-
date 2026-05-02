@@ -1,24 +1,26 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { hashPassword } from "@/lib/password";
-import { sendEmail, getSignUpVerificationTemplate } from "@/lib/email";
-import { generateEnquiryNumber } from "@/lib/enquiry";
 import { sendOTP } from "@/lib/otp";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password } = body;
+    const { name, email, password, role, assignedClass } = body;
 
-    if (!email || !password) {
+    // Normalize email
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Validation
+    if (!name || !normalizedEmail || !password || !role) {
       return NextResponse.json(
-        { error: "Email and password required" },
+        { error: "Name, email, password, and role are required" },
         { status: 400 }
       );
     }
 
     // Validate email format
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return NextResponse.json(
         { error: "Valid email is required" },
         { status: 400 }
@@ -44,40 +46,75 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check if email already exists
+    // Validate role
+    if (!["CLASS_TEACHER", "HOD"].includes(role)) {
+      return NextResponse.json(
+        { error: "Invalid role. Must be CLASS_TEACHER or HOD" },
+        { status: 400 }
+      );
+    }
+
+    // CLASS_TEACHER must have assignedClass
+    if (role === "CLASS_TEACHER" && !assignedClass) {
+      return NextResponse.json(
+        { error: "Class Teachers must have an assigned class" },
+        { status: 400 }
+      );
+    }
+
+    // Check if email already exists in Staff
+    const existingStaff = await db.staff.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingStaff) {
+      return NextResponse.json(
+        { error: "Email already registered as staff" },
+        { status: 409 }
+      );
+    }
+
+    // Check if email already exists in Student
     const existingStudent = await db.student.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingStudent) {
       return NextResponse.json(
-        { error: "Email already registered" },
-        { status: 400 }
+        { error: "Email already registered as student" },
+        { status: 409 }
       );
     }
 
     // Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Generate unique enquiry number
-    const enquiryNumber = await generateEnquiryNumber();
+    // Delete any existing temporary signup for this email
+    await db.staffSignupTemp.deleteMany({
+      where: { email: normalizedEmail },
+    });
 
-    // Create student account with PRE_APPLICANT status (Stage 1: Initial Entry)
-    // Student cannot login until email is verified
-    const student = await db.student.create({
+    // Store temporary signup data (expires in 10 minutes, same as OTP)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    
+    await db.staffSignupTemp.create({
       data: {
-        email,
+        email: normalizedEmail,
+        name,
         password: hashedPassword,
-        status: "PRE_APPLICANT", // Stage 1: Cannot login yet
-        isActive: true,
-        enquiryNumber,
+        role,
+        assignedClass: role === "CLASS_TEACHER" ? assignedClass : null,
+        expiresAt,
       },
     });
 
+    console.log("Temporary staff signup data stored:", { email: normalizedEmail, role });
+
     // Send OTP for email verification
-    const otpResult = await sendOTP(email);
+    const otpResult = await sendOTP(normalizedEmail);
 
     if (!otpResult.success) {
+      console.log("Failed to send OTP for:", normalizedEmail);
       return NextResponse.json(
         { error: "Failed to send verification email" },
         { status: 500 }
@@ -86,12 +123,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Account created. Check your email for verification code.",
-      studentId: student.id,
-      enquiryNumber: student.enquiryNumber,
+      message: "Verification code sent to your email. Please verify to complete registration.",
     });
   } catch (error) {
-    console.error("Sign-up error:", error);
+    console.error("Staff sign-up error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

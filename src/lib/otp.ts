@@ -9,9 +9,11 @@ export function generateOTP(): string {
 // Send OTP to email
 export async function sendOTP(email: string): Promise<{ success: boolean; message: string }> {
   try {
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Delete any existing OTP for this email
     await db.oTP.deleteMany({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     // Generate new OTP
@@ -21,24 +23,28 @@ export async function sendOTP(email: string): Promise<{ success: boolean; messag
     // Store OTP in database with PENDING status
     await db.oTP.create({
       data: {
-        email,
+        email: normalizedEmail,
         code,
         status: "PENDING",
         expiresAt,
       },
     });
 
+    console.log("OTP created:", { email: normalizedEmail, code, expiresAt });
+
     // Send email
     const emailSent = await sendEmail({
-      to: email,
+      to: normalizedEmail,
       subject: "Email Verification - Kalnet Admission",
-      html: getOTPEmailTemplate(code, email),
+      html: getOTPEmailTemplate(code, normalizedEmail),
     });
 
     if (!emailSent) {
+      console.log("Failed to send OTP email to:", normalizedEmail);
       return { success: false, message: "Failed to send OTP email" };
     }
 
+    console.log("OTP email sent to:", normalizedEmail);
     return { success: true, message: "OTP sent successfully" };
   } catch (error) {
     console.error("Send OTP error:", error);
@@ -49,15 +55,24 @@ export async function sendOTP(email: string): Promise<{ success: boolean; messag
 // Phase 2: Enhanced OTP verification with reuse prevention
 export async function verifyOTP(email: string, code: string): Promise<{ success: boolean; message: string }> {
   try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedCode = code.trim();
+
+    console.log("Looking for OTP:", { email: normalizedEmail, code: normalizedCode });
+
     const otp = await db.oTP.findUnique({
-      where: { code },
+      where: { code: normalizedCode },
     });
 
     if (!otp) {
+      console.log("OTP not found for code:", normalizedCode);
       return { success: false, message: "Invalid OTP" };
     }
 
-    if (otp.email !== email) {
+    console.log("OTP found:", { otpEmail: otp.email, providedEmail: normalizedEmail, status: otp.status });
+
+    if (otp.email.toLowerCase() !== normalizedEmail) {
+      console.log("OTP email mismatch");
       return { success: false, message: "OTP does not match email" };
     }
 
@@ -89,6 +104,7 @@ export async function verifyOTP(email: string, code: string): Promise<{ success:
       return { success: false, message: "OTP verification failed - try again" };
     }
 
+    console.log("OTP verified successfully for:", normalizedEmail);
     return { success: true, message: "OTP verified successfully" };
   } catch (error) {
     console.error("Verify OTP error:", error);

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CalendarOff, CheckCircle2, Clock } from "lucide-react";
+import { CalendarOff, CheckCircle2, Clock, RefreshCw } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -26,9 +26,42 @@ interface Props {
 export default function LeaveClient({ initialData, stats, balance }: Props) {
   const toast = useToast();
   const [data, setData] = useState(initialData);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentBalance, setCurrentBalance] = useState(balance);
 
-  const monthlyPct = Math.round((balance.monthlyUsed / balance.monthlyLimit) * 100);
-  const yearlyPct  = Math.round((balance.yearlyUsed  / balance.yearlyLimit)  * 100);
+  // Auto-refresh every 30 seconds to check for HOD approvals
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshData();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const refreshData = async () => {
+    try {
+      setIsRefreshing(true);
+      const [leaveRes, balanceRes] = await Promise.all([
+        fetch("/api/staff/leave"),
+        fetch("/api/staff/leave/balance"),
+      ]);
+
+      if (leaveRes.ok && balanceRes.ok) {
+        const leaveData = await leaveRes.json();
+        const balanceData = await balanceRes.json();
+
+        setData(leaveData);
+        setCurrentBalance(balanceData);
+      }
+    } catch (error) {
+      console.error("Error refreshing leave data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const monthlyPct = Math.round((currentBalance.monthlyUsed / currentBalance.monthlyLimit) * 100);
+  const yearlyPct  = Math.round((currentBalance.yearlyUsed  / currentBalance.yearlyLimit)  * 100);
 
   // Fix #14 — cancel a PENDING leave request
   const handleCancel = async (id: number) => {
@@ -56,12 +89,12 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
         initial="initial"
         animate="animate"
       >
-        <StatCard label="Total Requests" value={stats.total.toString()} sub="This academic year"
+        <StatCard label="Total Requests" value={data.length.toString()} sub="This academic year"
           icon={<CalendarOff size={18} className="text-primary" />} iconBg="bg-primary-50" delay={0.05} />
-        <StatCard label="Approved" value={stats.approved.toString()} sub={`${stats.daysTaken} days taken`}
+        <StatCard label="Approved" value={data.filter((r) => r.status === "APPROVED").length.toString()} sub={`${data.filter((r) => r.status === "APPROVED").reduce((acc, r) => acc + Math.ceil((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1, 0)} days taken`}
           icon={<CheckCircle2 size={18} className="text-emerald-600" />} iconBg="bg-emerald-50"
           badge="Cleared" badgeVariant="success" delay={0.1} />
-        <StatCard label="Pending" value={stats.pending.toString()} sub="Awaiting review"
+        <StatCard label="Pending" value={data.filter((r) => r.status === "PENDING").length.toString()} sub="Awaiting review"
           icon={<Clock size={18} className="text-amber-500" />} iconBg="bg-amber-50"
           badge="In review" badgeVariant="warning" delay={0.15} />
       </motion.div>
@@ -78,10 +111,10 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">This Month</p>
             <Badge
-              variant={balance.monthlyRemaining === 0 ? "danger" : balance.monthlyRemaining === 1 ? "warning" : "success"}
+              variant={currentBalance.monthlyRemaining === 0 ? "danger" : currentBalance.monthlyRemaining === 1 ? "warning" : "success"}
               dot
             >
-              {balance.monthlyRemaining} of {balance.monthlyLimit} days remaining
+              {currentBalance.monthlyUsed} of {currentBalance.monthlyLimit} days used
             </Badge>
           </div>
           <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -92,7 +125,7 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
               transition={{ duration: 0.8, ease: "easeOut" }}
             />
           </div>
-          <p className="mt-2 text-xs text-gray-400">{balance.monthlyUsed} used · {balance.monthlyLimit} total</p>
+          <p className="mt-2 text-xs text-gray-400">{currentBalance.monthlyRemaining} remaining · {currentBalance.monthlyLimit} total</p>
         </div>
 
         {/* Yearly */}
@@ -100,10 +133,10 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">This Year</p>
             <Badge
-              variant={balance.yearlyRemaining === 0 ? "danger" : balance.yearlyRemaining <= 3 ? "warning" : "success"}
+              variant={currentBalance.yearlyRemaining === 0 ? "danger" : currentBalance.yearlyRemaining <= 3 ? "warning" : "success"}
               dot
             >
-              {balance.yearlyRemaining} of {balance.yearlyLimit} days remaining
+              {currentBalance.yearlyUsed} of {currentBalance.yearlyLimit} days used
             </Badge>
           </div>
           <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -114,14 +147,14 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
               transition={{ duration: 0.8, ease: "easeOut" }}
             />
           </div>
-          <p className="mt-2 text-xs text-gray-400">{balance.yearlyUsed} used · {balance.yearlyLimit} total</p>
+          <p className="mt-2 text-xs text-gray-400">{currentBalance.yearlyRemaining} remaining · {currentBalance.yearlyLimit} total</p>
         </div>
       </motion.div>
 
       {/* Monthly Breakdown */}
       <Card title="Monthly Breakdown" subtitle="Leave usage per month" delay={0.22}>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {balance.monthlyBreakdown.map((m) => (
+          {currentBalance.monthlyBreakdown.map((m) => (
             <div key={m.month} className="text-center">
               <p className="text-[10px] text-gray-400 mb-1">{m.month}</p>
               <div className="h-12 w-full bg-gray-50 rounded-lg flex flex-col items-center justify-end overflow-hidden relative">
@@ -140,7 +173,7 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
 
       {/* Leave Request Form */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...easeOut, delay: 0.25 }}>
-        <LeaveRequestForm balance={balance} />
+        <LeaveRequestForm balance={currentBalance} />
       </motion.div>
 
       {/* History Table */}
