@@ -17,6 +17,7 @@ type FeeRecord = {
   amount: number;
   paidAmount: number;
   dueDate: string;
+  paidAt: string | null;
   status: "PAID" | "PENDING" | "OVERDUE";
 };
 
@@ -30,19 +31,168 @@ export default function FeesClient() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<{ records: FeeRecord[], summary: any } | null>(null);
+  const [payingFeeId, setPayingFeeId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const reloadFees = () =>
     fetch("/api/fees")
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch fees: ${res.status}`);
+        return res.json();
+      })
       .then(d => {
+        console.log("Fees reloaded successfully:", d);
         setData(d);
         setLoading(false);
       })
       .catch(err => {
-        console.error(err);
+        console.error("Error reloading fees:", err);
         setLoading(false);
       });
+
+  useEffect(() => {
+    reloadFees().catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
   }, []);
+
+  const loadRazorpay = async () => {
+    if (typeof window === "undefined") return false;
+    if ((window as any).Razorpay) return true;
+
+    return await new Promise<boolean>((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const downloadReceipt = async (feeId: number) => {
+    try {
+      toast.info("Opening receipt...", "Receipt will open in a new tab.");
+      window.open(`/api/fees/${feeId}/receipt`, '_blank');
+    } catch (e: any) {
+      toast.error("Receipt", e?.message ?? "Failed to open receipt");
+    }
+  };
+
+  const startPayment = async (feeId: number) => {
+    try {
+      setPayingFeeId(feeId);
+      const loaded = await loadRazorpay();
+      if (!loaded) {
+        toast.error("Payment gateway", "Failed to load Razorpay. Check your internet connection.");
+        return;
+      }
+
+      const orderRes = await fetch("/api/payments/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feeId }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData?.error || "Unable to create order");
+
+      const rzp = new (window as any).Razorpay({
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: orderData.name,
+        description: orderData.description,
+        order_id: orderData.orderId,
+        prefill: orderData.prefill,
+        notes: orderData.notes,
+        handler: async (response: any) => {
+          const verifyRes = await fetch("/api/payments/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(response),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) throw new Error(verifyData?.error || "Payment verification failed");
+
+          toast.success("Payment successful", "Your fee status has been updated.");
+          await reloadFees();
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment cancelled", "You can retry anytime.");
+          },
+        },
+        theme: { color: "#16a34a" },
+      });
+
+      rzp.open();
+    } catch (e: any) {
+      toast.error("Payment failed", e?.message ?? "Please try again.");
+    } finally {
+      setPayingFeeId(null);
+    }
+  };
+
+  const payOutstanding = async () => {
+    try {
+      if (!data || data.summary.outstanding <= 0) {
+        toast.info("No outstanding", "All fees are paid.");
+        return;
+      }
+
+      setPayingFeeId(-1); // Use -1 to indicate outstanding payment
+      const loaded = await loadRazorpay();
+      if (!loaded) {
+        toast.error("Payment gateway", "Failed to load Razorpay. Check your internet connection.");
+        return;
+      }
+
+      const orderRes = await fetch("/api/payments/outstanding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: data.summary.outstanding,
+          reason: "Outstanding Balance Payment",
+        }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData?.error || "Unable to create order");
+
+      const rzp = new (window as any).Razorpay({
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: orderData.name,
+        description: orderData.description,
+        order_id: orderData.orderId,
+        prefill: orderData.prefill,
+        notes: orderData.notes,
+        handler: async (response: any) => {
+          const verifyRes = await fetch("/api/payments/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(response),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) throw new Error(verifyData?.error || "Payment verification failed");
+
+          toast.success("Payment successful", "Your outstanding balance has been cleared.");
+          await reloadFees();
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment cancelled", "You can retry anytime.");
+          },
+        },
+        theme: { color: "#16a34a" },
+      });
+
+      rzp.open();
+    } catch (e: any) {
+      toast.error("Payment failed", e?.message ?? "Please try again.");
+    } finally {
+      setPayingFeeId(null);
+    }
+  };
 
   if (loading) return <div className="p-10 text-center text-gray-400">Loading your fee details...</div>;
   if (!data) return <div className="p-10 text-center text-red-500">Failed to load fee information.</div>;
@@ -99,7 +249,8 @@ export default function FeesClient() {
               size="sm"
               icon={<ArrowUpRight size={14} />}
               className="shrink-0"
-              onClick={() => toast.success("Redirecting to payment gateway...", "You will be redirected shortly.")}
+              onClick={payOutstanding}
+              loading={payingFeeId === -1}
             >
               Pay Now
             </Button>
@@ -144,21 +295,47 @@ export default function FeesClient() {
                         <span className="font-medium text-[#444]">{row.term}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-[#444]">₹{Number(row.amount).toLocaleString()}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold text-[#444]">₹{Number(row.amount).toLocaleString()}</span>
+                        {row.paidAmount > 0 && (
+                          <span className="text-xs text-gray-400">
+                            Paid: ₹{Number(row.paidAmount).toLocaleString()} | 
+                            <span className="text-red-500 font-medium ml-1">
+                              Remaining: ₹{(Number(row.amount) - Number(row.paidAmount)).toLocaleString()}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className={`px-6 py-4 ${isOverdue ? "text-red-500 font-medium" : "text-gray-400"}`}>{new Date(row.dueDate).toLocaleDateString()}</td>
-                    <td className="px-6 py-4 text-gray-400">{isPaid ? "Received" : "—"}</td>
+                    <td className="px-6 py-4 text-gray-400">{isPaid && row.paidAt ? new Date(row.paidAt).toLocaleDateString() : "—"}</td>
                     <td className="px-6 py-4"><Badge variant={cfg.variant} dot>{cfg.label}</Badge></td>
                     <td className="px-6 py-4 text-right">
                       {isPaid ? (
                         <motion.button
                           className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition-colors"
                           whileHover={{ scale: 1.05 }}
-                          onClick={() => toast.info("Downloading receipt...", "Receipt will download shortly.")}
+                          onClick={() => downloadReceipt(row.id)}
                         >
                           <Download size={12} /> Receipt
                         </motion.button>
-                      ) : isOverdue ? (
-                        <Button variant="danger" size="xs" onClick={() => toast.error("Payment gateway", "Please contact the accounts office.")}>Pay Now</Button>
+                      ) : isOverdue || row.paidAmount > 0 ? (
+                        <div className="flex flex-col items-end gap-2">
+                          <Button
+                            variant={isOverdue ? "danger" : "primary"}
+                            size="xs"
+                            loading={payingFeeId === row.id}
+                            onClick={() => startPayment(row.id)}
+                          >
+                            {row.paidAmount > 0 ? "Pay Remaining" : "Pay Now"}
+                          </Button>
+                          {row.paidAmount > 0 && (
+                            <span className="text-xs text-gray-400">
+                              ₹{(Number(row.amount) - Number(row.paidAmount)).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-xs text-gray-300">Not due yet</span>
                       )}

@@ -31,6 +31,7 @@ enum FeeType {
   Tuition
   Transport
   Activity
+  Outstanding
 }
 
 enum FeeStatus {
@@ -90,24 +91,32 @@ model Student {
   applicationFeePaid    Boolean        @default(false)
   applicationFeeAmount  Decimal?       @db.Decimal(10, 2)
   createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  updatedAt             DateTime?      @updatedAt
   fees                  Fee[]
   leaveRequests         LeaveRequest[]
   notifications         Notification[]
+  studentDocuments      StudentDocument[]
+  feePaymentTransactions FeePaymentTransaction[]
 
   @@map("students")
 }
 
 model Staff {
-  id            Int            @id @default(autoincrement())
-  name          String
-  email         String         @unique
-  password      String         // Hashed password
-  role          Role           @default(CLASS_TEACHER)
-  assignedClass String?
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  leaveRequests LeaveRequest[]
+  id                Int                 @id @default(autoincrement())
+  name              String
+  email             String              @unique
+  password          String              // Hashed password
+  role              Role                @default(CLASS_TEACHER)
+  assignedClass     String?
+  isActive          Boolean             @default(true)
+  approvedBy        String?             // Email of HOD who approved
+  approvedAt        DateTime?
+  rejectionReason   String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime?           @updatedAt
+  leaveRequests     LeaveRequest[]
+  classAssignments  ClassAssignment[]
+  staffLeaveBalance StaffLeaveBalance?
 
   @@map("staff")
 }
@@ -131,15 +140,18 @@ model Admission {
 }
 
 model Fee {
-  id         Int       @id @default(autoincrement())
-  studentId  Int
-  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  term       String
-  dueDate    DateTime
-  amount     Decimal   @db.Decimal(10, 2)
-  paidAmount Decimal   @default(0.00) @db.Decimal(10, 2)
-  type       FeeType
-  status     FeeStatus @default(PENDING)
+  id                      Int       @id @default(autoincrement())
+  studentId               Int
+  student                 Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term                    String
+  dueDate                 DateTime
+  amount                  Decimal   @db.Decimal(10, 2)
+  paidAmount              Decimal   @default(0.00) @db.Decimal(10, 2)
+  paidAt                  DateTime?
+  paymentMethod           String?
+  type                    FeeType
+  status                  FeeStatus @default(PENDING)
+  feePaymentTransactions  FeePaymentTransaction[]
 
   @@map("fees")
 }
@@ -158,18 +170,21 @@ model Announcement {
 }
 
 model LeaveRequest {
-  id          Int                @id @default(autoincrement())
+  id                Int                @id @default(autoincrement())
   // Either studentId OR staffId is set — not both
-  studentId   Int?
-  student     Student?           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  staffId     Int?
-  staff       Staff?             @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  leaveType   String
-  fromDate    DateTime
-  toDate      DateTime
-  reason      String             @db.Text
-  status      LeaveRequestStatus @default(PENDING)
-  submittedAt DateTime           @default(now())
+  studentId         Int?
+  student           Student?           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  staffId           Int?
+  staff             Staff?             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  leaveType         String
+  fromDate          DateTime
+  toDate            DateTime
+  reason            String             @db.Text
+  status            LeaveRequestStatus @default(PENDING)
+  rejectionReason   String?
+  approvedBy        Int?
+  approvedAt        DateTime?
+  submittedAt       DateTime           @default(now())
 
   @@map("leave_requests")
 }
@@ -182,6 +197,7 @@ model Notification {
   title     String
   message   String           @db.Text
   isRead    Boolean          @default(false)
+  readAt    DateTime?
   createdAt DateTime         @default(now())
 
   @@map("notifications")
@@ -219,4 +235,163 @@ model StaffSignupTemp {
   createdAt     DateTime  @default(now())
 
   @@map("staff_signup_temp")
+}
+
+model PaymentOrder {
+  id                Int       @id @default(autoincrement())
+  feeId             Int
+  studentId         Int
+  amountPaise       Int       // Amount in paise (1 rupee = 100 paise)
+  currency          String    @default("INR")
+  razorpayOrderId   String    @unique
+  status            String    @default("CREATED") // CREATED, PAID, FAILED
+  receipt           String?   @db.VarChar(500)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("payment_orders")
+}
+
+model PaymentTransaction {
+  id                  Int       @id @default(autoincrement())
+  razorpayOrderId     String    @unique
+  razorpayPaymentId   String
+  razorpaySignature   String
+  rawResponse         String?   @db.LongText // JSON response from Razorpay
+  createdAt           DateTime  @default(now())
+
+  @@map("payment_transactions")
+}
+
+model FeeReceipt {
+  id                Int       @id @default(autoincrement())
+  razorpayOrderId   String    @unique
+  receiptNumber     String?   @unique
+  issuedAt          DateTime
+  createdAt         DateTime  @default(now())
+
+  @@map("fee_receipts")
+}
+
+model AuditLog {
+  id           Int       @id @default(autoincrement())
+  action       String
+  entityType   String
+  entityId     Int
+  userId       Int?
+  userRole     Role
+  oldValue     String?   @db.LongText
+  newValue     String?   @db.LongText
+  details      String?   @db.LongText
+  timestamp    DateTime  @default(now())
+
+  @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model StudentDocument {
+  id               Int       @id @default(autoincrement())
+  studentId        Int
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  documentType     String
+  fileName         String
+  fileUrl          String    @db.VarChar(500)
+  fileSize         Int?
+  uploadedAt       DateTime  @default(now())
+  status           String    @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verifiedBy       Int?
+  verifiedAt       DateTime?
+  rejectionReason  String?
+
+  @@map("student_documents")
+  @@index([studentId])
+  @@index([status])
+}
+
+model FeePaymentTransaction {
+  id               Int       @id @default(autoincrement())
+  feeId            Int
+  fee              Fee       @relation(fields: [feeId], references: [id], onDelete: Cascade)
+  studentId        Int
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount           Decimal   @db.Decimal(10, 2)
+  paymentMethod    String    // ONLINE, CASH, CHECK, BANK_TRANSFER
+  transactionId    String?
+  paymentDate      DateTime  @default(now())
+  razorpayOrderId  String?
+  razorpayPaymentId String?
+  status           String    @default("SUCCESS") // SUCCESS, FAILED, PENDING
+  notes            String?
+
+  @@map("fee_payment_transactions")
+  @@index([feeId])
+  @@index([studentId])
+  @@index([paymentDate])
+}
+
+model PaymentWebhookLog {
+  id               Int       @id @default(autoincrement())
+  event            String
+  razorpayOrderId  String?
+  razorpayPaymentId String?
+  payload          String    @db.LongText
+  status           String    @default("PENDING") // PROCESSED, FAILED, PENDING
+  errorMessage     String?
+  processedAt      DateTime?
+  receivedAt       DateTime  @default(now())
+
+  @@map("payment_webhook_logs")
+  @@index([razorpayOrderId])
+  @@index([event])
+  @@index([receivedAt])
+}
+
+model EmailLog {
+  id                Int       @id @default(autoincrement())
+  recipientEmail    String
+  subject           String
+  emailType         String
+  relatedEntityType String?
+  relatedEntityId   Int?
+  status            String    @default("SENT") // SENT, FAILED, BOUNCED
+  errorMessage      String?
+  sentAt            DateTime  @default(now())
+
+  @@map("email_logs")
+  @@index([recipientEmail])
+  @@index([emailType])
+  @@index([sentAt])
+}
+
+model ClassAssignment {
+  id            Int       @id @default(autoincrement())
+  staffId       Int
+  staff         Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  classEnrolled String
+  assignedAt    DateTime  @default(now())
+  unassignedAt  DateTime?
+  reason        String?
+
+  @@map("class_assignments")
+  @@index([staffId])
+  @@index([classEnrolled])
+  @@index([assignedAt])
+}
+
+model StaffLeaveBalance {
+  id              Int       @id @default(autoincrement())
+  staffId         Int       @unique
+  staff           Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  year            Int
+  totalYearlyLeave Int      @default(20)
+  usedLeave       Int       @default(0)
+  remainingLeave  Int       @default(20)
+  monthlyUsed     Int       @default(0)
+  lastUpdatedAt   DateTime  @default(now()) @updatedAt
+
+  @@map("staff_leave_balance")
+  @@unique([staffId, year])
+  @@index([year])
 }

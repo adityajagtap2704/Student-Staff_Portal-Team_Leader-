@@ -18,13 +18,15 @@ import { staggerContainer, easeOut } from "@/components/motion/MotionConfig";
 
 interface Props { session: Session }
 
-type Tab = "overview" | "leave" | "admissions" | "staff" | "announcements";
+type Tab = "overview" | "leave" | "admissions" | "staff" | "fees" | "payments" | "announcements";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "overview",      label: "Overview",      icon: BookOpen    },
   { key: "leave",         label: "Leave",         icon: Clock       },
   { key: "admissions",    label: "Admissions",    icon: Users       },
   { key: "staff",         label: "Staff",         icon: CheckCircle2},
+  { key: "fees",          label: "Fees",          icon: CreditCard  },
+  { key: "payments",      label: "Payments",      icon: CreditCard  },
   { key: "announcements", label: "Announcements", icon: Megaphone   },
 ];
 
@@ -174,6 +176,9 @@ export default function HodClient({ session }: Props) {
   const [admissions,    setAdmissions]    = useState<any[]>([]);
   const [staff,         setStaff]         = useState<any[]>([]);
   const [fees,          setFees]          = useState<{ fees: any[]; summary: Record<string, { count: number; total: number }> } | null>(null);
+  const [feesView,      setFeesView]      = useState<{ fees: any[]; summary: any; classes: string[]; activeClass: string } | null>(null);
+  const [feeClass,      setFeeClass]      = useState<string>("ALL");
+  const [payments,      setPayments]      = useState<any[]>([]);
   const [recentAnns,    setRecentAnns]    = useState<any[]>([]);
   const [loadingAnns,   setLoadingAnns]   = useState(true);
 
@@ -181,6 +186,8 @@ export default function HodClient({ session }: Props) {
   const [loadingA, setLoadingA] = useState(false);
   const [loadingS, setLoadingS] = useState(false);
   const [loadingF, setLoadingF] = useState(false);
+  const [loadingP, setLoadingP] = useState(false);
+  const [loadingFV, setLoadingFV] = useState(false);
 
   // ── Track which tabs have been loaded ────────────────────────────────────
   const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set());
@@ -277,6 +284,21 @@ export default function HodClient({ session }: Props) {
         .then(r => r.json()).then(d => { setRecentAnns(Array.isArray(d) ? d : []); setLoadingAnns(false); })
         .catch(() => setLoadingAnns(false));
     }
+    if (activeTab === "payments") {
+      setLoadingP(true);
+      fetch("/api/payments?limit=100")
+        .then(r => r.json())
+        .then(d => { setPayments(Array.isArray(d?.payments) ? d.payments : []); setLoadingP(false); })
+        .catch(() => setLoadingP(false));
+    }
+    if (activeTab === "fees") {
+      setLoadingFV(true);
+      const q = feeClass && feeClass !== "ALL" ? `?class=${encodeURIComponent(feeClass)}` : "";
+      fetch(`/api/hod/fees${q}`)
+        .then(r => r.json())
+        .then(d => { setFeesView(d); setLoadingFV(false); })
+        .catch(() => setLoadingFV(false));
+    }
     // Staff pending count for Leave tab badge
     if (activeTab === "leave") {
       fetch("/api/hod/staff-leave")
@@ -289,9 +311,21 @@ export default function HodClient({ session }: Props) {
     }
   }, [activeTab, loadedTabs]);
 
+  // ── Effect for class filtering in fees tab ───────────────────────────────────
+  useEffect(() => {
+    if (activeTab === "fees" && loadedTabs.has("fees")) {
+      setLoadingFV(true);
+      const q = feeClass && feeClass !== "ALL" ? `?class=${encodeURIComponent(feeClass)}` : "";
+      fetch(`/api/hod/fees${q}`)
+        .then(r => r.json())
+        .then(d => { setFeesView(d); setLoadingFV(false); })
+        .catch(() => setLoadingFV(false));
+    }
+  }, [feeClass, activeTab]);
+
   // ── Initial load for overview ─────────────────────────────────────────────
   useEffect(() => {
-    setLoadingL(true); setLoadingA(true); setLoadingS(true); setLoadingF(true);
+    setLoadingL(true); setLoadingA(true); setLoadingS(true); setLoadingF(true); setLoadingP(true);
     setLoadedTabs(new Set(["overview"]));
 
     fetch("/api/hod/leave")
@@ -309,6 +343,14 @@ export default function HodClient({ session }: Props) {
     fetch("/api/announcements")
       .then(r => r.json()).then(d => { setRecentAnns(Array.isArray(d) ? d : []); setLoadingAnns(false); })
       .catch(() => setLoadingAnns(false));
+    fetch("/api/payments?limit=100")
+      .then(r => r.json())
+      .then(d => { setPayments(Array.isArray(d?.payments) ? d.payments : []); setLoadingP(false); })
+      .catch(() => setLoadingP(false));
+    fetch("/api/hod/fees")
+      .then(r => r.json())
+      .then(d => { setFeesView(d); setLoadingFV(false); })
+      .catch(() => setLoadingFV(false));
     fetch("/api/hod/staff-leave")
       .then(r => r.json())
       .then(d => {
@@ -933,7 +975,7 @@ export default function HodClient({ session }: Props) {
                                       const res = await fetch(`/api/hod/staff/${s.id}/approve`, {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ assignedClass: s.assignedClass || null }),
+                                        body: JSON.stringify({ assignedClass: null }),
                                       });
                                       if (res.ok) {
                                         setStaff(prev => prev.map(st => st.id === s.id ? { ...st, isActive: true } : st));
@@ -1124,6 +1166,124 @@ export default function HodClient({ session }: Props) {
               })()}
             </Card>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          FEES TAB (Class filter + per-student status)
+      ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "fees" && (
+        <div className="space-y-4">
+          <Card title="Fee Status" subtitle="Track paid / pending / overdue by class" noPadding delay={0.1}>
+            <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Class</span>
+                <select
+                  value={feeClass}
+                  onChange={(e) => setFeeClass(e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#444] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                >
+                  <option value="ALL">All</option>
+                  {(feesView?.classes ?? []).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="text-xs text-gray-400">
+                {feesView?.summary ? (
+                  <span>
+                    PAID: {feesView.summary.PAID?.count ?? 0} · PENDING: {feesView.summary.PENDING?.count ?? 0} · OVERDUE: {feesView.summary.OVERDUE?.count ?? 0}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {loadingFV ? (
+              <SkeletonTable rows={7} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-50">
+                      {["Student", "Class", "Roll No.", "Term", "Amount", "Paid", "Due", "Status"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(feesView?.fees ?? []).map((f: any) => (
+                      <tr key={f.id} className={`hover:bg-gray-50/50 transition-colors ${f.status === "OVERDUE" ? "bg-red-50/30" : ""}`}>
+                        <td className="px-4 py-3 font-medium text-[#444] whitespace-nowrap">{f.student?.name ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{f.student?.classEnrolled ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-400 font-mono text-xs whitespace-nowrap">{f.student?.rollNumber ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{f.term}</td>
+                        <td className="px-4 py-3 text-gray-500">₹{Number(f.amount).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-gray-500">₹{Number(f.paidAmount).toLocaleString("en-IN")}</td>
+                        <td className={`px-4 py-3 font-semibold ${Number(f.amount) - Number(f.paidAmount) > 0 ? "text-red-600" : "text-emerald-700"}`}>
+                          ₹{(Number(f.amount) - Number(f.paidAmount)).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={f.status === "PAID" ? "success" : f.status === "OVERDUE" ? "danger" : "warning"} dot>
+                            {String(f.status).toLowerCase()}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                    {(feesView?.fees ?? []).length === 0 && (
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No fee records found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          PAYMENTS TAB
+      ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "payments" && (
+        <div className="space-y-4">
+          <Card title="Payment Transactions" subtitle="Latest fee payments across all classes" noPadding delay={0.1}>
+            {loadingP ? (
+              <SkeletonTable rows={6} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-50">
+                      {["Student", "Class", "Term", "Amount", "Status", "Receipt", "Updated"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {payments.map((p: any) => (
+                      <tr key={`${p.razorpayOrderId}`} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-[#444] whitespace-nowrap">{p.studentName ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{p.classEnrolled ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.term ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-500">₹{((Number(p.amountPaise) || 0) / 100).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={p.status === "PAID" ? "success" : p.status === "FAILED" ? "danger" : "neutral"} dot>
+                            {String(p.status).toLowerCase()}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.receiptNumber ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                          {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                    {payments.length === 0 && (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No payment records found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 

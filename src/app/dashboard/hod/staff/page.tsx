@@ -53,12 +53,12 @@ export default function HODStaffPage() {
     }
   };
 
-  const handleApprove = async (staffId: number, assignClass: string) => {
+  const handleApprove = async (staffId: number, assignClass: string | null) => {
     try {
       const res = await fetch(`/api/hod/staff/${staffId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedClass: assignClass || null }),
+        body: JSON.stringify({ assignedClass: null }), // Always approve without class
       });
 
       const data = await res.json();
@@ -70,6 +70,7 @@ export default function HODStaffPage() {
 
       setError("");
       fetchStaff();
+      alert("✅ Staff approved successfully!\n\nYou can assign a class later using the reassignment feature in the Approved tab.");
     } catch (err) {
       setError("Error approving staff");
       console.error(err);
@@ -111,6 +112,46 @@ export default function HODStaffPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Handle class conflict - offer swap option
+        if (data.code === "CLASS_CONFLICT" && data.existingTeacherId) {
+          const shouldSwap = confirm(
+            `⚠️ CLASS CONFLICT\n\n` +
+            `${data.error}\n\n` +
+            `Current Assignments:\n` +
+            `• ${data.currentTeacherName} → ${data.currentTeacherClass || "Unassigned"}\n` +
+            `• ${data.existingTeacherName} → ${data.existingTeacherClass}\n\n` +
+            `${data.suggestion}\n\n` +
+            `Click OK to SWAP their classes, or Cancel to go back.`
+          );
+
+          if (shouldSwap) {
+            // Perform swap
+            const swapRes = await fetch(`/api/hod/staff/${selectedStaff.id}/reassign-class`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                newClass: newClass || null,
+                swapWithStaffId: data.existingTeacherId 
+              }),
+            });
+
+            const swapData = await swapRes.json();
+
+            if (!swapRes.ok) {
+              setError(swapData.error || "Failed to swap classes");
+              return;
+            }
+
+            setError("");
+            setShowModal(false);
+            setNewClass("");
+            setSelectedStaff(null);
+            fetchStaff();
+            alert(`✅ Classes swapped successfully!\n\n${swapData.message}`);
+            return;
+          }
+        }
+
         setError(data.error || "Failed to reassign class");
         return;
       }
@@ -120,6 +161,7 @@ export default function HODStaffPage() {
       setNewClass("");
       setSelectedStaff(null);
       fetchStaff();
+      alert("✅ Class reassigned successfully!");
     } catch (err) {
       setError("Error reassigning class");
       console.error(err);
@@ -231,7 +273,7 @@ export default function HODStaffPage() {
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={() => handleApprove(member.id, member.assignedClass || "")}
+                              onClick={() => handleApprove(member.id, null)}
                               className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
                               title="Approve"
                             >
@@ -280,25 +322,50 @@ export default function HODStaffPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
           >
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Reassign Class</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Reassign Class</h2>
             <p className="text-sm text-gray-600 mb-4">
               Reassigning <strong>{selectedStaff.name}</strong> to a new class
             </p>
 
+            {/* Current assignment info */}
+            {selectedStaff.assignedClass && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-gray-600">Current Assignment:</p>
+                <p className="text-sm font-semibold text-blue-600">{selectedStaff.assignedClass}</p>
+              </div>
+            )}
+
+            {!selectedStaff.assignedClass && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-gray-600">Status:</p>
+                <p className="text-sm font-semibold text-amber-600">Not yet assigned to any class</p>
+              </div>
+            )}
+
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Class</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select New Class</label>
               <select
                 value={newClass}
                 onChange={(e) => setNewClass(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               >
-                <option value="">No Class (Unassign)</option>
+                {/* Show "None" option only for newly approved staff (no current class) */}
+                {!selectedStaff.assignedClass && (
+                  <option value="">None (Unassign)</option>
+                )}
                 {CLASSES.map((cls) => (
                   <option key={cls} value={cls}>
                     {cls}
                   </option>
                 ))}
               </select>
+              
+              {/* Show note for already assigned staff */}
+              {selectedStaff.assignedClass && (
+                <p className="mt-2 text-xs text-gray-500">
+                  💡 <strong>Note:</strong> Students in the old class will remain in their current class. Only the teacher&apos;s assignment changes.
+                </p>
+              )}
             </div>
 
             <div className="flex gap-3">

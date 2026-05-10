@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Session } from "next-auth";
-import { Users, CheckCircle2, Clock, Send, CalendarDays, Tag, AlertCircle, TrendingDown } from "lucide-react";
+import { Users, CheckCircle2, Clock, Send, CalendarDays, Tag, AlertCircle, TrendingDown, CreditCard } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -15,7 +15,7 @@ import { staggerContainer, easeOut } from "@/components/motion/MotionConfig";
 
 interface Props { session: Session }
 
-type Tab = "leave" | "my-leave" | "students";
+type Tab = "leave" | "my-leave" | "students" | "fees" | "payments";
 
 interface LeaveBalance {
   yearlyUsed: number;
@@ -44,10 +44,14 @@ export default function StaffClient({ session }: Props) {
   const [leaves,         setLeaves]         = useState<any[]>([]);   // student leaves
   const [myLeaves,       setMyLeaves]       = useState<any[]>([]);   // staff's own leaves
   const [myLeaveBalance, setMyLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [payments,       setPayments]       = useState<any[]>([]);
+  const [feesByStudent,  setFeesByStudent]  = useState<any[]>([]);
   const [loadingS,       setLoadingS]       = useState(true);
   const [loadingL,       setLoadingL]       = useState(true);
   const [loadingML,      setLoadingML]      = useState(true);
   const [loadingLB,      setLoadingLB]      = useState(true);
+  const [loadingF,       setLoadingF]       = useState(true);
+  const [loadingP,       setLoadingP]       = useState(true);
   const [activeTab,      setActiveTab]      = useState<Tab>("leave");
   const [leaveFilter,    setLeaveFilter]    = useState<"PENDING"|"ALL"|"APPROVED"|"REJECTED">("PENDING");
 
@@ -74,6 +78,18 @@ export default function StaffClient({ session }: Props) {
     fetch("/api/staff/leave/balance")
       .then(r => r.json()).then(d => { setMyLeaveBalance(d); setLoadingLB(false); })
       .catch(() => setLoadingLB(false));
+
+    // Payments for assigned class
+    fetch("/api/payments?limit=50")
+      .then(r => r.json())
+      .then(d => { setPayments(Array.isArray(d?.payments) ? d.payments : []); setLoadingP(false); })
+      .catch(() => setLoadingP(false));
+
+    // Fees status for assigned class
+    fetch("/api/staff/fees")
+      .then(r => r.json())
+      .then(d => { setFeesByStudent(Array.isArray(d?.students) ? d.students : []); setLoadingF(false); })
+      .catch(() => setLoadingF(false));
   }, []);
 
   // ── Approve / Reject student leave ──────────────────────────────────────
@@ -146,6 +162,8 @@ export default function StaffClient({ session }: Props) {
     { key: "leave",    label: "Student Leaves"  },
     { key: "my-leave", label: "My Leave"        },
     { key: "students", label: "My Students"     },
+    { key: "fees",     label: "Fees"            },
+    { key: "payments", label: "Payments"        },
   ];
 
   return (
@@ -536,6 +554,97 @@ export default function StaffClient({ session }: Props) {
                   ))}
                   {students.length === 0 && (
                     <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No students found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── Fees Tab ── */}
+      {activeTab === "fees" && (
+        <Card title="Fee Status" subtitle={`Paid / Pending / Overdue — ${user.assignedClass}`} noPadding delay={0.2}>
+          {loadingF ? <SkeletonTable rows={6} /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-50">
+                    {["Student", "Roll No.", "Total", "Paid", "Outstanding", "Status"].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {feesByStudent.map((row: any) => {
+                    const s = row.student;
+                    const sum = row.summary || {};
+                    const hasOverdue = (sum.overdueCount || 0) > 0;
+                    const hasPending = (sum.pendingCount || 0) > 0;
+                    const variant = hasOverdue ? "danger" : hasPending ? "warning" : "success";
+                    const label = hasOverdue ? "Overdue" : hasPending ? "Pending" : "Paid";
+                    return (
+                      <tr key={s.id} className={`hover:bg-gray-50/50 transition-colors ${hasOverdue ? "bg-red-50/30" : ""}`}>
+                        <td className="px-4 py-3 font-medium text-[#444] whitespace-nowrap flex items-center gap-2">
+                          <CreditCard size={14} className={hasOverdue ? "text-red-500" : hasPending ? "text-amber-500" : "text-emerald-600"} />
+                          {s.name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-400 font-mono text-xs whitespace-nowrap">{s.rollNumber ?? "—"}</td>
+                        <td className="px-4 py-3 text-gray-500">₹{Number(sum.total ?? 0).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-gray-500">₹{Number(sum.paid ?? 0).toLocaleString("en-IN")}</td>
+                        <td className={`px-4 py-3 font-semibold ${Number(sum.outstanding ?? 0) > 0 ? "text-red-600" : "text-emerald-700"}`}>
+                          ₹{Number(sum.outstanding ?? 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={variant as any} dot>
+                            {label} {hasPending || hasOverdue ? `(${(sum.pendingCount || 0) + (sum.overdueCount || 0)} due)` : ""}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {feesByStudent.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No fee records found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── Payments Tab ── */}
+      {activeTab === "payments" && (
+        <Card title="Recent Payments" subtitle={`Latest transactions for ${user.assignedClass}`} noPadding delay={0.2}>
+          {loadingP ? <SkeletonTable rows={4} /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-50">
+                    {["Student", "Term", "Amount", "Status", "Receipt", "Updated"].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {payments.map((p: any) => (
+                    <tr key={`${p.razorpayOrderId}`} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-[#444] whitespace-nowrap">{p.studentName ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.term ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-500">₹{((Number(p.amountPaise) || 0) / 100).toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={p.status === "PAID" ? "success" : p.status === "FAILED" ? "danger" : "neutral"} dot>
+                          {String(p.status).toLowerCase()}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.receiptNumber ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                        {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {payments.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
                   )}
                 </tbody>
               </table>

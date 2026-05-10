@@ -7,6 +7,8 @@ import { ArrowLeft, Calendar, User } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 
+export const dynamic = "force-dynamic";
+
 export default function AnnouncementDetailPage() {
   const params = useParams();
   const router = useRouter();

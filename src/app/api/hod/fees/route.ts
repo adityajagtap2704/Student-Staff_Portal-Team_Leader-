@@ -3,7 +3,7 @@ import db from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const user    = session?.user as any;
@@ -11,8 +11,13 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const url = new URL(req.url);
+    const classFilter = (url.searchParams.get("class") || "").trim();
+
     const fees = await db.fee.findMany({
-      include: { student: { select: { name: true, classEnrolled: true, rollNumber: true } } },
+      where: classFilter ? { student: { classEnrolled: classFilter } } : undefined,
+      include: { student: { select: { id: true, name: true, classEnrolled: true, rollNumber: true } } },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
     });
 
     const summary = {
@@ -26,7 +31,18 @@ export async function GET() {
       summary[fee.status].total += Number(fee.amount);
     }
 
-    return NextResponse.json({ fees, summary });
+    const classes = await db.student.findMany({
+      select: { classEnrolled: true },
+      distinct: ["classEnrolled"],
+      where: { classEnrolled: { not: null } },
+    });
+
+    return NextResponse.json({
+      fees,
+      summary,
+      classes: classes.map(c => c.classEnrolled).filter(Boolean).sort(),
+      activeClass: classFilter || "ALL",
+    });
   } catch (error) {
     console.error("HOD Fees Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

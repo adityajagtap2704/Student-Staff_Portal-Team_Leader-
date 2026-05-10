@@ -52,7 +52,17 @@ export async function PATCH(
       },
     });
 
-    // Phase 3: Auto-create student account on approval (Stage 3: Post-Approval)
+    // Set admissionDate when student is approved
+    if (status === "APPROVED") {
+      await db.student.updateMany({
+        where: { admissionId: id },
+        data: { 
+          admissionDate: new Date(),
+          status: "STUDENT",
+        },
+      });
+    }
+
     let createdStudent: any = null;
     let studentCredentials: any = null;
 

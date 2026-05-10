@@ -16,7 +16,7 @@ export default function StaffSignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<"CLASS_TEACHER" | "HOD">("CLASS_TEACHER");
+  const [role, setRole] = useState<"CLASS_TEACHER">("CLASS_TEACHER");
   const [assignedClass, setAssignedClass] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -79,8 +79,8 @@ export default function StaffSignUpPage() {
           name,
           email,
           password,
-          role,
-          assignedClass: role === "CLASS_TEACHER" ? assignedClass : null,
+          role: "CLASS_TEACHER", // Always send CLASS_TEACHER
+          assignedClass,
         }),
       });
 
@@ -226,15 +226,12 @@ export default function StaffSignUpPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Role *
                   </label>
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as "CLASS_TEACHER" | "HOD")}
-                    disabled={loading}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="CLASS_TEACHER">Class Teacher</option>
-                    <option value="HOD">Head of Department (HOD)</option>
-                  </select>
+                  <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                    Class Teacher
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Staff members register as Class Teachers. HOD role is assigned by administration.
+                  </p>
                 </div>
 
                 {role === "CLASS_TEACHER" && (

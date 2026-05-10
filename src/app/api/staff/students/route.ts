@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getLeaveBalance } from "@/lib/leaveBalance";
 
 export async function GET() {
   try {
@@ -24,32 +23,25 @@ export async function GET() {
     
     console.log("[STAFF STUDENTS] Looking for students in class:", assignedClass);
 
-    // First, check if any students exist with this class
-    const allStudents = await db.student.findMany({
-      select: { id: true, name: true, classEnrolled: true },
-    });
-    
-    console.log("[STAFF STUDENTS] Total students in DB:", allStudents.length);
-    console.log("[STAFF STUDENTS] Sample students:", allStudents.slice(0, 5));
-
+    // Filter students by assigned class only
     const students = await db.student.findMany({
-      where:   { classEnrolled: assignedClass },
+      where: { classEnrolled: assignedClass },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        rollNumber: true,
+        classEnrolled: true,
+        status: true,
+      },
       orderBy: { name: "asc" },
     });
 
-    console.log("[STAFF STUDENTS] Found students in", assignedClass + ":", students.length);
-
-    // Attach leave balance for each student
-    const result = await Promise.all(
-      students.map(async (s) => {
-        const balance = await getLeaveBalance(s.id);
-        return { ...s, leaveBalance: balance };
-      })
-    );
-
-    return NextResponse.json(result);
+    console.log("[STAFF STUDENTS] Found students:", students.length);
+    return NextResponse.json(students);
   } catch (error) {
     console.error("Staff Students Error:", error);
-    return NextResponse.json({ error: "Internal Server Error", details: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

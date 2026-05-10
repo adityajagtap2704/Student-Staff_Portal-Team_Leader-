@@ -22,7 +22,7 @@ export async function GET() {
       orderBy: { dueDate: "asc" },
     });
 
-    // Compute totals
+    // Compute totals using Decimal for precision
     const totalDue = fees.reduce((acc, f) => acc + Number(f.amount), 0);
     const totalPaid = fees.reduce((acc, f) => acc + Number(f.paidAmount), 0);
     const outstanding = totalDue - totalPaid;
@@ -30,9 +30,9 @@ export async function GET() {
     return NextResponse.json({
       records: fees,
       summary: {
-        totalDue,
-        totalPaid,
-        outstanding
+        totalDue: parseFloat(totalDue.toFixed(2)),
+        totalPaid: parseFloat(totalPaid.toFixed(2)),
+        outstanding: parseFloat(outstanding.toFixed(2)),
       }
     });
   } catch (error) {

@@ -41,9 +41,17 @@ export default function LeaveClient({ initialData, stats, balance }: Props) {
   const refreshData = async () => {
     try {
       setIsRefreshing(true);
+      
+      // Determine which endpoints to call based on user type
+      const session = await fetch("/api/auth/session").then(r => r.json());
+      const isStaff = session?.user?.role === "CLASS_TEACHER" || session?.user?.role === "HOD";
+      
+      const leaveEndpoint = isStaff ? "/api/staff/leave" : "/api/leave";
+      const balanceEndpoint = isStaff ? "/api/staff/leave/balance" : "/api/leave/balance";
+      
       const [leaveRes, balanceRes] = await Promise.all([
-        fetch("/api/staff/leave"),
-        fetch("/api/staff/leave/balance"),
+        fetch(leaveEndpoint),
+        fetch(balanceEndpoint),
       ]);
 
       if (leaveRes.ok && balanceRes.ok) {

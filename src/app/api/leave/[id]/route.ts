@@ -70,7 +70,7 @@ export async function PATCH(
       // Send email notification
       try {
         const student = await db.student.findUnique({ where: { id: leave.studentId } });
-        if (student && student.email) {
+        if (student && student.email && student.name) {
           if (isApproved) {
             const emailSent = await sendLeaveApprovedEmail(
               student.name,
