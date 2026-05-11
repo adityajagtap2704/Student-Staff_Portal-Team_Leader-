@@ -7,7 +7,7 @@ import {
   LayoutDashboard, CreditCard, CalendarOff,
   Megaphone, UserCircle, X, GraduationCap,
   ChevronRight, ChevronLeft, Users, BookOpen,
-  Bell,
+  Bell, FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { Session } from "next-auth";
@@ -16,6 +16,8 @@ import { Session } from "next-auth";
 const studentLinks = [
   { href: "/dashboard",               label: "Dashboard",     icon: LayoutDashboard, exact: true  },
   { href: "/dashboard/fees",          label: "Fees",          icon: CreditCard,      exact: false },
+  { href: "/dashboard/payments",      label: "Payments",      icon: CreditCard,      exact: false },
+  { href: "/dashboard/documents",     label: "Documents",     icon: FileText,        exact: false },
   { href: "/dashboard/leave",         label: "Leave",         icon: CalendarOff,     exact: false },
   { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone,       exact: false },
   { href: "/dashboard/profile",       label: "My Profile",    icon: UserCircle,      exact: false },
@@ -23,12 +25,19 @@ const studentLinks = [
 
 const teacherLinks = [
   { href: "/dashboard/staff",         label: "My Dashboard",  icon: LayoutDashboard, exact: true  },
+  { href: "/dashboard/leave/balance", label: "Leave Balance", icon: CalendarOff,     exact: false },
   { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone,       exact: false },
 ];
 
 const hodLinks = [
   { href: "/dashboard/hod",           label: "HOD Dashboard", icon: LayoutDashboard, exact: true  },
-  { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone,       exact: false },
+  { href: "/dashboard/hod/class-assignments", label: "Class Assignments", icon: Users, exact: false },
+  { href: "/dashboard/hod/outstanding-payments", label: "Outstanding Fees", icon: CreditCard, exact: false },
+  { href: "/dashboard/hod/documents", label: "Document Verification", icon: FileText, exact: false },
+  { href: "/dashboard/hod/email-logs", label: "Email Logs", icon: Megaphone, exact: false },
+  { href: "/dashboard/hod/payment-logs", label: "Payment Logs", icon: CreditCard, exact: false },
+  { href: "/dashboard/hod/audit-logs", label: "Audit Logs", icon: BookOpen, exact: false },
+  { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone, exact: false },
 ];
 
 interface SidebarProps {

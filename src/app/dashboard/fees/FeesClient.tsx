@@ -19,6 +19,7 @@ type FeeRecord = {
   dueDate: string;
   paidAt: string | null;
   status: "PAID" | "PENDING" | "OVERDUE";
+  type?: string; // Add type field for deduplication
 };
 
 const statusConfig: Record<string, { variant: "success"|"danger"|"neutral"; label: string }> = {
@@ -197,7 +198,35 @@ export default function FeesClient() {
   if (loading) return <div className="p-10 text-center text-gray-400">Loading your fee details...</div>;
   if (!data) return <div className="p-10 text-center text-red-500">Failed to load fee information.</div>;
 
-  const { records, summary } = data;
+  let { records, summary } = data;
+
+  // Deduplicate Outstanding fees with same due date (merge them)
+  const deduplicatedRecords: FeeRecord[] = [];
+  const outstandingMap = new Map<string, FeeRecord>();
+
+  for (const record of records) {
+    if (record.type === "Outstanding") {
+      const key = new Date(record.dueDate).toISOString().split('T')[0]; // Group by date
+      if (outstandingMap.has(key)) {
+        // Merge with existing outstanding fee
+        const existing = outstandingMap.get(key)!;
+        existing.amount = Number(existing.amount) + Number(record.amount);
+        existing.paidAmount = Number(existing.paidAmount) + Number(record.paidAmount);
+      } else {
+        outstandingMap.set(key, { ...record });
+      }
+    } else {
+      deduplicatedRecords.push(record);
+    }
+  }
+
+  // Add merged outstanding fees
+  deduplicatedRecords.push(...Array.from(outstandingMap.values()));
+
+  // Re-sort by due date
+  deduplicatedRecords.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+  const records_final = deduplicatedRecords;
 
   return (
     <div className="space-y-5">
@@ -272,7 +301,7 @@ export default function FeesClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {records.map((row, i) => {
+              {records_final.map((row, i) => {
                 const cfg = statusConfig[row.status];
                 const isOverdue = row.status === "OVERDUE";
                 const isPaid = row.status === "PAID";

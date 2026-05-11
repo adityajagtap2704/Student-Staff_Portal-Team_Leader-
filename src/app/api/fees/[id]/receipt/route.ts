@@ -313,10 +313,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       feeId,
     });
 
+    // Return HTML that can be printed/saved as PDF by the browser
     return new NextResponse(html, {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `inline; filename="receipt-${feeId}.html"`,
       },
     });
   } catch (error) {
